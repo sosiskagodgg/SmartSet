@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="FitnessTracker.AI/FitnessTracker.AI.csproj" />
+  <Project Path="FitnessTracker.Application/FitnessTracker.Application.csproj" />
+  <Project Path="FitnessTracker.Domain/FitnessTracker.Domain.csproj" />
+  <Project Path="FitnessTracker.Infrastructure/FitnessTracker.Infrastructure.csproj" />
+  <Project Path="FitnessTracker.TelegramBot/FitnessTracker.TelegramBot.csproj" />
+</Solution>

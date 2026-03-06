@@ -1,0 +1,46 @@
+{
+  "id": "fullbody_intermediate",
+  "name": "Full Body для среднего уровня",
+  "description": "Интенсивная full body программа 3 раза в неделю",
+  "level": "intermediate",
+  "daysPerWeek": 3,
+  "goal": "hypertrophy",
+  "days": [
+    {
+      "dayNumber": 1,
+      "name": "Тяжелый день",
+      "exercises": [
+        { "name": "Приседания со штангой", "sets": 4, "repsMin": 5, "repsMax": 8 },
+        { "name": "Жим лежа", "sets": 4, "repsMin": 5, "repsMax": 8 },
+        { "name": "Тяга штанги в наклоне", "sets": 4, "repsMin": 6, "repsMax": 8 },
+        { "name": "Жим гантелей сидя", "sets": 3, "repsMin": 8, "repsMax": 12 },
+        { "name": "Подъем штанги на бицепс", "sets": 3, "repsMin": 8, "repsMax": 12 },
+        { "name": "Французский жим", "sets": 3, "repsMin": 8, "repsMax": 12 }
+      ]
+    },
+    {
+      "dayNumber": 2,
+      "name": "Средний день",
+      "exercises": [
+        { "name": "Становая тяга", "sets": 3, "repsMin": 5, "repsMax": 5 },
+        { "name": "Жим гантелей на наклонной", "sets": 4, "repsMin": 8, "repsMax": 12 },
+        { "name": "Подтягивания с весом", "sets": 4, "repsMin": 6, "repsMax": 8 },
+        { "name": "Махи гантелями в стороны", "sets": 3, "repsMin": 12, "repsMax": 15 },
+        { "name": "Молотки", "sets": 3, "repsMin": 10, "repsMax": 12 },
+        { "name": "Разгибание рук на блоке", "sets": 3, "repsMin": 12, "repsMax": 15 }
+      ]
+    },
+    {
+      "dayNumber": 3,
+      "name": "Объемный день",
+      "exercises": [
+        { "name": "Румынская тяга", "sets": 4, "repsMin": 8, "repsMax": 10 },
+        { "name": "Жим гантелей лежа", "sets": 4, "repsMin": 10, "repsMax": 15 },
+        { "name": "Тяга гантели к поясу", "sets": 4, "repsMin": 8, "repsMax": 12 },
+        { "name": "Тяга штанги к подбородку", "sets": 3, "repsMin": 10, "repsMax": 12 },
+        { "name": "Сгибание рук с гантелями", "sets": 3, "repsMin": 10, "repsMax": 15 },
+        { "name": "Отжимания на брусьях с весом", "sets": 3, "repsMin": 8, "repsMax": 12 }
+      ]
+    }
+  ]
+}

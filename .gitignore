@@ -1,0 +1,26 @@
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+
+## Secrets - НИКОГДА НЕ УДАЛЯТЬ ЭТИ СТРОКИ!
+appsettings.json
+appsettings.Development.json
+*. secrets.json
+*.local.json
+
+## VS Code
+.vscode/

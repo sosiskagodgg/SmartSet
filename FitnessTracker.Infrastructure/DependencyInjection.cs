@@ -13,31 +13,26 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Добавляем DbContext (используем PostgreSQL)
-        // Вместо AddDbContext используй AddDbContextFactory
+        // Добавляем DbContext
         services.AddDbContextFactory<FitnessDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-        // Регистрируем репозитории
-        services.AddScoped<IMuscleRepository, MuscleRepository>();
-        services.AddScoped<IUserRepository, UserRepository>();
-
-        services.AddScoped<IUserParameterRepository, UserParameterRepository>(); // Добавить
-
-        services.AddScoped<IExerciseLibraryRepository, ExerciseLibraryRepository>();
-
-        // Workout Repositories
-        services.AddScoped<IWorkoutRepository, WorkoutRepository>();
-        services.AddScoped<IWorkoutExerciseRepository, WorkoutExerciseRepository>();
-        services.AddScoped<IExerciseSetRepository, ExerciseSetRepository>();
-
-        // Program Repositories
-        services.AddScoped<IProgramTemplateRepository, ProgramTemplateRepository>();
-        services.AddScoped<IProgramDayRepository, ProgramDayRepository>();
-
-        // Statistics
-        services.AddScoped<IWorkoutStatisticsRepository, WorkoutStatisticsRepository>();
+        // Ручная регистрация ВСЕХ репозиториев
+        RegisterRepositories(services);
 
         return services;
+    }
+
+    private static void RegisterRepositories(IServiceCollection services)
+    {
+        // Явно и понятно: каждый репозиторий регистрируем руками
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserWorkoutRepository, UserWorkoutRepository>();
+        services.AddScoped<IWorkoutRepository, WorkoutRepository>();
+        services.AddScoped<IUserParametersRepository, UserParametersRepository>();
+        // Добавляй сюда новые репозитории по мере создания
+        // services.AddScoped<IExerciseRepository, ExerciseRepository>();
+        // services.AddScoped<IMuscleRepository, MuscleRepository>();
+        // и так далее...
     }
 }

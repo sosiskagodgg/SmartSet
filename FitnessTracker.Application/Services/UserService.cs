@@ -1,86 +1,74 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using FitnessTracker.Application.Interfaces;
-using FitnessTracker.Domain.Entities;
+﻿using FitnessTracker.Domain.Entities;
 using FitnessTracker.Domain.Interfaces;
-using Microsoft.Extensions.Logging;
+using FitnessTracker.Application.Interfaces;
 
 namespace FitnessTracker.Application.Services;
 
 public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
-    private readonly ILogger<UserService> _logger;
 
-    public UserService(IUserRepository userRepository, ILogger<UserService> logger)
+    public UserService(IUserRepository userRepository)
     {
         _userRepository = userRepository;
-        _logger = logger;
     }
 
-    public async Task<User?> GetByIdAsync(long id)
+    public async Task<User?> GetUserByIdAsync(long id, CancellationToken ct = default)
     {
-        _logger.LogDebug("Getting user by id {UserId}", id);
+        return await _userRepository.GetByIdAsync(id, ct);
+    }
 
-        // UserRepository сам создаст свой scope с DbContext
-        var user = await _userRepository.GetByIdAsync(id);
+    public async Task<User?> GetUserByTelegramIdAsync(long telegramId, CancellationToken ct = default)
+    {
+        var users = await _userRepository.GetAllAsync(int.MaxValue, ct);
+        return users.FirstOrDefault(u => u.TelegramId == telegramId);
+    }
 
-        if (user == null)
-            _logger.LogWarning("User with id {UserId} not found", id);
+    public async Task<List<User>> GetAllUsersAsync(int limit = 50, CancellationToken ct = default)
+    {
+        return await _userRepository.GetAllAsync(limit, ct);
+    }
+
+    public async Task<User> CreateUserAsync(long telegramId, string name, string? username = null, CancellationToken ct = default)
+    {
+        var user = new User
+        {
+            TelegramId = telegramId,
+            Name = name,
+            Username = username,
+            SubscriptionStatus = "inactive"
+        };
+
+        await _userRepository.AddAsync(user, ct);
         return user;
     }
 
-    public async Task<List<User>> GetAllAsync(int limit = 50)
+    public async Task UpdateUserAsync(User user, CancellationToken ct = default)
     {
-        _logger.LogDebug("Getting all users (limit {Limit})", limit);
-        return await _userRepository.GetAllAsync(limit);
+        await _userRepository.UpdateAsync(user, ct);
     }
 
-    public async Task<User?> CreateAsync(User user)
+    public async Task DeleteUserAsync(User user, CancellationToken ct = default)
     {
-        _logger.LogInformation("Creating user {UserName}", user?.Username);
-        var created = await _userRepository.AddAsync(user);
-        if (!created)
-        {
-            _logger.LogError("Failed to create user {UserName}", user?.Username);
-            return null;
-        }
-
-        _logger.LogInformation("User {UserName} created", user.Username);
-        return user;
+        await _userRepository.DeleteAsync(user, ct);
     }
 
-    public async Task<bool> UpdateAsync(User user)
+    public async Task<bool> UserExistsAsync(long telegramId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Updating user {UserId}", user?.Id);
-        var updated = await _userRepository.Update(user);
-        if (!updated)
-        {
-            _logger.LogError("Failed to update user {UserId}", user?.Id);
-            return false;
-        }
-
-        return true;
+        var user = await GetUserByTelegramIdAsync(telegramId, ct);
+        return user != null;
     }
 
-    public async Task<bool> DeleteAsync(long id)
+    public async Task UpdateSubscriptionAsync(User user, DateTime? endDate, string status, CancellationToken ct = default)
     {
-        _logger.LogInformation("Deleting user {UserId}", id);
-        var user = await _userRepository.GetByIdAsync(id);
-        if (user == null)
-        {
-            _logger.LogWarning("User {UserId} not found for deletion", id);
-            return false;
-        }
+        user.SubscriptionEndDate = endDate;
+        user.SubscriptionStatus = status;
+        await _userRepository.UpdateAsync(user, ct);
+    }
 
-        var deleted = await _userRepository.Delete(user);
-        if (!deleted)
-        {
-            _logger.LogError("Failed to delete user {UserId}", id);
-            return false;
-        }
-
-        return true;
+    public async Task<bool> HasActiveSubscriptionAsync(User user, CancellationToken ct = default)
+    {
+        return user.SubscriptionStatus == "active" &&
+               (!user.SubscriptionEndDate.HasValue || user.SubscriptionEndDate > DateTime.UtcNow);
     }
 }

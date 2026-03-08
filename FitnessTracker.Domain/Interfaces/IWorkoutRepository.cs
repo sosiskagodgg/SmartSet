@@ -1,11 +1,11 @@
 ﻿using FitnessTracker.Domain.Entities;
-namespace FitnessTracker.Domain.Interfaces;
-public interface IWorkoutRepository
+
+namespace FitnessTracker.Domain.Interfaces
 {
-    Task<Workout?> GetByIdAsync(long id);
-    Task<Workout?> GetCurrentWorkoutAsync(long userId);
-    Task<List<Workout>> GetUserWorkoutsAsync(long userId, DateTime? from = null, DateTime? to = null);
-    Task<bool> AddAsync(Workout workout);
-    Task<bool> UpdateAsync(Workout workout);
-    Task<bool> DeleteAsync(long id);
+    /// <summary>
+    /// Репозиторий для работы с ежедневными тренировками
+    /// </summary>
+    public interface IWorkoutRepository : IBaseRepository<Workout>
+    {
+    }
 }

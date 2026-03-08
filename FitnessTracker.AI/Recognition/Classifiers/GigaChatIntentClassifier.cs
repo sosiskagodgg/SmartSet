@@ -298,6 +298,8 @@ public class GigaChatIntentClassifier : IIntentClassifier
         return new Intent(IntentType.Unknown, 0.1);
     }
 
+    // FitnessTracker.AI.Recognition.Classifiers/GigaChatIntentClassifier.cs
+
     private string BuildPromptFromCommands(List<ICommand> commands)
     {
         var intentDescriptions = new List<string>();
@@ -320,11 +322,24 @@ public class GigaChatIntentClassifier : IIntentClassifier
                 intentDescriptions.Add($"  Примеры: {string.Join(", ", command.TrainingPhrases.Take(3))}");
             }
 
-            // Добавляем сущности, которые нужны команде
+            // Добавляем сущности, которые нужны команде (используем DisplayName вместо Description)
             foreach (var entity in command.RequiredEntities)
             {
-                entityDescriptions.Add($"- {entity.Type}: {entity.Description}" +
-                    (entity.PossibleValues != null ? $" (например: {string.Join(", ", entity.PossibleValues)})" : ""));
+                var entityDesc = $"- {entity.Type}: {entity.DisplayName}";
+
+                // Добавляем единицу измерения если есть
+                if (!string.IsNullOrEmpty(entity.Unit))
+                {
+                    entityDesc += $" (в {entity.Unit})";
+                }
+
+                // Добавляем примеры если есть
+                if (entity.Examples != null && entity.Examples.Any())
+                {
+                    entityDesc += $" например: {string.Join(", ", entity.Examples)}";
+                }
+
+                entityDescriptions.Add(entityDesc);
             }
         }
 

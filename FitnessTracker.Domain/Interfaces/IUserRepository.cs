@@ -1,22 +1,11 @@
-﻿using System.Collections.Generic;
-using FitnessTracker.Domain.Entities;
+﻿using FitnessTracker.Domain.Entities;
 
-namespace FitnessTracker.Domain.Interfaces;
-
-public interface IUserRepository
+namespace FitnessTracker.Domain.Interfaces
 {
     /// <summary>
-    /// Получить пользователя по ID
+    /// Репозиторий для работы с пользователями
     /// </summary>
-    Task<User?> GetByIdAsync(long id);
-
-    Task<List<User>> GetAllAsync(int limit = 50);
-
-    Task<User?> GetByUserName(string userName);
-
-    Task<bool> AddAsync(User user);
-
-    Task<bool> Update(User user);
-
-    Task<bool> Delete(User user);
+    public interface IUserRepository : IBaseRepository<User>
+    {
+    }
 }

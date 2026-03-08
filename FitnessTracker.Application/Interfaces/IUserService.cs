@@ -1,36 +1,16 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using FitnessTracker.Domain.Entities;
+﻿using FitnessTracker.Domain.Entities;
 
 namespace FitnessTracker.Application.Interfaces;
 
-public interface IUserService
+public interface IUserService : IService  // ← Наследуем маркер
 {
-    /// <summary>
-    /// Получить пользователя по ID
-    /// </summary>
-    Task<User?> GetByIdAsync(long id);
-
-    /// <summary>
-    /// Получить всех пользователей
-    /// </summary>
-    Task<List<User>> GetAllAsync(int limit = 50);
-
-    /// <summary>
-    /// Создать пользователя
-    /// Возвращает созданного пользователя или null при ошибке
-    /// </summary>
-    Task<User?> CreateAsync(User user);
-
-    /// <summary>
-    /// Обновить пользователя
-    /// Возвращает true при успехе, иначе false
-    /// </summary>
-    Task<bool> UpdateAsync(User user);
-
-    /// <summary>
-    /// Удалить пользователя по ID
-    /// Возвращает true при успехе, иначе false
-    /// </summary>
-    Task<bool> DeleteAsync(long id);
+    Task<User?> GetUserByIdAsync(long id, CancellationToken ct = default);
+    Task<User?> GetUserByTelegramIdAsync(long telegramId, CancellationToken ct = default);
+    Task<List<User>> GetAllUsersAsync(int limit = 50, CancellationToken ct = default);
+    Task<User> CreateUserAsync(long telegramId, string name, string? username = null, CancellationToken ct = default);
+    Task UpdateUserAsync(User user, CancellationToken ct = default);
+    Task DeleteUserAsync(User user, CancellationToken ct = default);
+    Task<bool> UserExistsAsync(long telegramId, CancellationToken ct = default);
+    Task UpdateSubscriptionAsync(User user, DateTime? endDate, string status, CancellationToken ct = default);
+    Task<bool> HasActiveSubscriptionAsync(User user, CancellationToken ct = default);
 }

@@ -1,13 +1,19 @@
 ﻿using FitnessTracker.AI.Commands.Base;
 using FitnessTracker.AI.Configuration;
+using FitnessTracker.AI.Core.Attributes;
 using FitnessTracker.AI.Core.Interfaces;
 using FitnessTracker.AI.Core.Orchestration;
+using FitnessTracker.AI.Core.Registry;
+using FitnessTracker.AI.Core.Router;
+using FitnessTracker.AI.PublicServices;
 using FitnessTracker.AI.Recognition.Classifiers;
 using FitnessTracker.AI.Recognition.Recognizers;
 using FitnessTracker.AI.Services;
+using FitnessTracker.AI.Services.Base;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 namespace FitnessTracker.AI.Extensions;
 
@@ -20,7 +26,7 @@ public static class ServiceCollectionExtensions
         services.Configure<RecognitionConfig>(configuration.GetSection("Recognition"));
 
         // HTTP клиенты
-        services.AddHttpClient<GigaChatEntityRecognizer>();
+        services.AddScoped<GigaChatEntityRecognizer>();
 
         // Токен сервис
         services.AddSingleton<IGigaChatTokenService, GigaChatTokenService>();
@@ -30,7 +36,10 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IGroupClassifier, GroupClassifier>();
         services.AddHttpClient<GroupClassifier>();
+        services.AddScoped<FitnessAIRouter>();
 
+        // Автоматически регистрируем публичные сервисы
+        services.AddPublicServices(typeof(PublicServiceBase<>).Assembly);
 
         // Classifiers
         services.AddScoped<IIntentClassifier, CommandRegistryClassifier>();
@@ -51,6 +60,13 @@ public static class ServiceCollectionExtensions
 
         // АВТОМАТИЧЕСКИ РЕГИСТРИРУЕМ ВСЕ КОМАНДЫ
         services.AddAllCommandsFromAssembly(typeof(HelpCommand).Assembly);
+
+
+        services.AddSingleton<DirectionRegistry>();
+
+        // Регистрируем классификатор
+        services.AddScoped<DirectionClassifier>();
+        services.AddScoped<UserParametersAIService>();
 
         return services;
     }
@@ -112,6 +128,40 @@ public static class ServiceCollectionExtensions
                     }
                 }
             });
+        }
+
+        return services;
+    }
+    /// <summary>
+    /// Автоматически регистрирует все публичные сервисы из сборки
+    /// </summary>
+    public static IServiceCollection AddPublicServices(this IServiceCollection services, System.Reflection.Assembly assembly)
+    {
+        var serviceTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract &&
+                   t.GetInterfaces().Any(i =>
+                       i.IsGenericType &&
+                       i.GetGenericTypeDefinition() == typeof(IPublicService<,>)))
+            .ToList();
+
+        foreach (var type in serviceTypes)
+        {
+            services.AddScoped(type);
+
+            // Регистрируем по интерфейсу
+            var interfaces = type.GetInterfaces()
+                .Where(i => i.IsGenericType &&
+                       i.GetGenericTypeDefinition() == typeof(IPublicService<,>));
+
+            foreach (var iface in interfaces)
+            {
+                services.AddScoped(iface, type);
+            }
+
+            var attribute = type.GetCustomAttribute<PublicServiceAttribute>();
+            var serviceName = attribute?.Name ?? type.Name.Replace("Service", "");
+
+            Console.WriteLine($"✅ Public service registered: {serviceName} -> {type.Name}");
         }
 
         return services;

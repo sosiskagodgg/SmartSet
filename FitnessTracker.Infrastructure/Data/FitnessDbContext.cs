@@ -10,27 +10,11 @@ public class FitnessDbContext : DbContext
     {
     }
 
-    // Users
+    // Добавляем DbSet для всех сущностей
     public DbSet<User> Users { get; set; }
-    public DbSet<UserParameter> UserParameters { get; set; }
-    public DbSet<Muscle> Muscles { get; set; }
-
-    // Exercises
-    public DbSet<Exercise> Exercises { get; set; }
-    public DbSet<ExerciseMuscle> ExerciseMuscles { get; set; }
-
-
-    // Workouts - НОВЫЕ
+    public DbSet<UserParameters> UserParameters { get; set; }
+    public DbSet<UserWorkout> UserWorkouts { get; set; }
     public DbSet<Workout> Workouts { get; set; }
-    public DbSet<WorkoutExercise> WorkoutExercises { get; set; }
-    public DbSet<ExerciseSet> ExerciseSets { get; set; }
-
-    // Programs - НОВЫЕ
-    public DbSet<ProgramTemplate> ProgramTemplates { get; set; }
-    public DbSet<ProgramDay> ProgramDays { get; set; }
-    public DbSet<ProgramDayExercise> ProgramDayExercises { get; set; }
-
-
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

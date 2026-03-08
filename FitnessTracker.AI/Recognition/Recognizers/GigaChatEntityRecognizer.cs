@@ -1,10 +1,12 @@
-﻿using System.Text;
-using System.Text.Json;
+﻿using FitnessTracker.AI.Configuration;
+using FitnessTracker.AI.Core.Interfaces;
+using FitnessTracker.AI.Core.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using FitnessTracker.AI.Core.Models;
-using FitnessTracker.AI.Core.Interfaces;
-using FitnessTracker.AI.Configuration;
+using Newtonsoft.Json.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 
 namespace FitnessTracker.AI.Recognition.Recognizers;
 
@@ -14,9 +16,11 @@ public class GigaChatEntityRecognizer : IEntityRecognizer
     private readonly GigaChatConfig _config;
     private readonly IGigaChatTokenService _tokenService;
     private readonly ICommandRegistry _commandRegistry;
+    private readonly HttpClient _httpClient;  // ← ДОБАВЛЕНО
 
     public int Priority => 100;
 
+    // Конструктор
     public GigaChatEntityRecognizer(
         IGigaChatTokenService tokenService,
         IOptions<GigaChatConfig> config,
@@ -27,6 +31,7 @@ public class GigaChatEntityRecognizer : IEntityRecognizer
         _commandRegistry = commandRegistry;
         _logger = logger;
         _config = config.Value;
+        _httpClient = new HttpClient();  // ← СОЗДАЕМ HTTPCLIENT
     }
 
     public async Task<List<Entity>> RecognizeAsync(string message, Intent? intent = null, CancellationToken cancellationToken = default)
@@ -123,6 +128,72 @@ public class GigaChatEntityRecognizer : IEntityRecognizer
             return new List<Entity>();
         }
     }
+    // FitnessTracker.AI.Recognition.Recognizers/GigaChatEntityRecognizer.cs
+
+    /// <summary>
+    /// Универсальный метод для отправки запросов в GigaChat
+    /// </summary>
+    // FitnessTracker.AI.Recognition.Recognizers/GigaChatEntityRecognizer.cs
+
+    /// <summary>
+    /// Универсальный метод для отправки запросов в GigaChat
+    /// </summary>
+    public async Task<string> AskAsync(string prompt, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var token = await _tokenService.GetAccessTokenAsync(cancellationToken);
+
+            // СОЗДАЕМ КЛИЕНТ С SSL ИГНОРИРОВАНИЕМ
+            var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    (sender, cert, chain, sslPolicyErrors) => true
+            };
+
+            using var client = new HttpClient(handler);
+
+            client.DefaultRequestHeaders.Clear();
+            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+            var requestBody = new
+            {
+                model = "GigaChat-2",
+                messages = new[]
+                {
+                new { role = "system", content = "Ты - полезный ассистент. Отвечай кратко и по делу." },
+                new { role = "user", content = prompt }
+            },
+                temperature = 0.1,
+                max_tokens = 300
+            };
+
+            var json = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await client.PostAsync(
+                "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
+                content,
+                cancellationToken);
+
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("GigaChat error: {StatusCode} - {Error}", response.StatusCode, responseBody);
+                return string.Empty;
+            }
+
+            var jsonResponse = JObject.Parse(responseBody);
+            return jsonResponse["choices"]?[0]?["message"]?["content"]?.ToString() ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling GigaChat");
+            return string.Empty;
+        }
+    }
+    // FitnessTracker.AI.Recognition.Recognizers/GigaChatEntityRecognizer.cs
 
     private string BuildEntityTypesFromCommands()
     {
@@ -139,11 +210,21 @@ public class GigaChatEntityRecognizer : IEntityRecognizer
         {
             foreach (var entity in command.RequiredEntities)
             {
-                var description = $"- {entity.Type}: {entity.Description}";
-                if (entity.PossibleValues != null && entity.PossibleValues.Any())
+                // Используем DisplayName вместо Description
+                var description = $"- {entity.Type}: {entity.DisplayName}";
+
+                // Добавляем единицу измерения если есть
+                if (!string.IsNullOrEmpty(entity.Unit))
                 {
-                    description += $" (например: {string.Join(", ", entity.PossibleValues)})";
+                    description += $" (в {entity.Unit})";
                 }
+
+                // Добавляем примеры если есть
+                if (entity.Examples != null && entity.Examples.Any())
+                {
+                    description += $" например: {string.Join(", ", entity.Examples)}";
+                }
+
                 entityDescriptions.Add(description);
             }
         }

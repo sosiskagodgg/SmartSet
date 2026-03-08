@@ -1,13 +1,34 @@
-﻿namespace FitnessTracker.Domain.Entities;
+﻿
+namespace FitnessTracker.Domain.Entities;
 
 public class User
 {
-    public long Id { get; set; }              // Это Telegram ID
-    public string? Username { get; set; }
-    public string? FirstName { get; set; }
-    public string? LastName { get; set; }
-    public DateTime RegisteredAt { get; set; }
-    public DateTime? LastActivityAt { get; set; }
+    /// <summary>
+    /// Имя пользователя
+    /// </summary>
+    public string Name { get; set; }
 
-    public ICollection<Muscle> Muscles { get; set; } = new List<Muscle>();
+    /// <summary>
+    /// Telegram ID пользователя
+    /// </summary>
+    public long TelegramId { get; set; }
+
+    /// <summary>
+    /// Username пользователя в Telegram
+    /// </summary>
+    public string? Username { get; set; }
+
+
+    /// <summary>
+    /// Дата окончания подписки
+    /// </summary>
+    public DateTime? SubscriptionEndDate { get; set; }
+
+    /// <summary>
+    /// Статус подписки (активна/неактивна)
+    /// </summary>
+    public string SubscriptionStatus { get; set; }
+
+
+
 }

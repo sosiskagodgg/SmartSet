@@ -1,4 +1,8 @@
-﻿using Telegram.Bot;
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using FitnessTracker.TelegramBot.Abstractions;
@@ -18,7 +22,7 @@ public class UpdateHandler : IUpdateHandler
         _logger = logger;
     }
 
-    public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
+    public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
         try
         {
@@ -28,7 +32,7 @@ public class UpdateHandler : IUpdateHandler
                     userId: update.Message.Chat.Id,
                     text: update.Message.Text,
                     messageId: update.Message.MessageId,
-                    ct: ct);
+                    ct: cancellationToken);
             }
             else if (update.CallbackQuery != null)
             {
@@ -37,7 +41,7 @@ public class UpdateHandler : IUpdateHandler
                     callbackData: update.CallbackQuery.Data!,
                     messageId: update.CallbackQuery.Message!.MessageId,
                     callbackQueryId: update.CallbackQuery.Id,
-                    ct: ct);
+                    ct: cancellationToken);
             }
         }
         catch (Exception ex)
@@ -46,7 +50,7 @@ public class UpdateHandler : IUpdateHandler
         }
     }
 
-    public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken ct)
+    public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
     {
         _logger.LogError(exception, "Error in bot");
         return Task.CompletedTask;

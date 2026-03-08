@@ -1,33 +1,32 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using FitnessTracker.Application.Services;
 using FitnessTracker.Application.Interfaces;
+using FitnessTracker.Application.Services;
 
 namespace FitnessTracker.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplication(
-        this IServiceCollection services)
+    public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        // Регистрируем сервисы приложения
-        services.AddScoped<IUserService, UserService>();
-        services.AddScoped<IUserParameterService, UserParameterService>(); // Добавить
-                                                                           // Exercise services
-        services.AddScoped<IExerciseService, ExerciseService>();
-        services.AddScoped<IMuscleService, MuscleService>();
+        // Ручная регистрация ВСЕХ сервисов
+        RegisterServices(services);
 
-        // Workout services
-        services.AddScoped<IWorkoutService, WorkoutService>();
-        services.AddScoped<ISetService, SetService>();
-        services.AddScoped<IWorkoutSessionService, WorkoutSessionService>();
-
-        // Program services
-        services.AddScoped<IProgramService, ProgramService>();
-
-        // Statistics
-        services.AddScoped<IStatisticsService, StatisticsService>();
-
-        services.AddSingleton<IWorkoutTemplateService, WorkoutTemplateService>();
         return services;
+    }
+
+    private static void RegisterServices(IServiceCollection services)
+    {
+        // Явно и понятно: каждый сервис регистрируем руками
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IWorkoutService, WorkoutService>();
+        services.AddScoped<IUserWorkoutService, UserWorkoutService>();
+        services.AddScoped <IUserParametersService, UserParametersService>();
+        // В FitnessTracker.TelegramBot/Program.cs или DependencyInjection.cs
+        services.AddScoped<UserRegistrationService>();
+        // Добавляй сюда новые сервисы по мере создания
+        // services.AddScoped<IExerciseService, ExerciseService>();
+        // services.AddScoped<IMuscleService, MuscleService>();
+        // services.AddScoped<IProgramService, ProgramService>();
+        // services.AddScoped<IStatisticsService, StatisticsService>();
     }
 }

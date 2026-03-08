@@ -1,32 +1,45 @@
-using Microsoft.EntityFrameworkCore;
+ï»¿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using FitnessTracker.Domain.Entities;
-public class UserConfiguration : IEntityTypeConfiguration<User>
+
+namespace FitnessTracker.Infrastructure.Data.Configurations
 {
-    public void Configure(EntityTypeBuilder<User> b)
+    public class UserConfiguration : IEntityTypeConfiguration<User>
     {
-        b.ToTable("users");
+        public void Configure(EntityTypeBuilder<User> builder)
+        {
+            builder.ToTable("users");
 
-        b.HasKey(u => u.Id);
+            builder.HasKey(u => u.TelegramId);
 
-        b.Property(u => u.Id)
-            .HasColumnName("id")
-            .ValueGeneratedNever(); // Íå àâòîèíêðåìåíò, à âðó÷íóþ
+            builder.Property(u => u.TelegramId)
+                .HasColumnName("telegramid")  // â† Ð”ÐžÐ‘ÐÐ’Ð˜Ð›!
+                .ValueGeneratedNever()
+                .IsRequired();
 
-        b.Property(u => u.Username)
-            .HasColumnName("username");
+            builder.Property(u => u.Name)
+                .HasColumnName("name")        // â† Ð”ÐžÐ‘ÐÐ’Ð˜Ð›!
+                .IsRequired()
+                .HasMaxLength(255);
 
-        b.Property(u => u.FirstName)
-            .HasColumnName("first_name");
+            builder.Property(u => u.Username)
+                .HasColumnName("username")    // â† Ð”ÐžÐ‘ÐÐ’Ð˜Ð›!
+                .HasMaxLength(100);
 
-        b.Property(u => u.LastName)
-            .HasColumnName("last_name");
+            builder.Property(u => u.SubscriptionStatus)
+                .HasColumnName("subscriptionstatus")  // â† Ð”ÐžÐ‘ÐÐ’Ð˜Ð›!
+                .IsRequired()
+                .HasMaxLength(50);
 
-        b.Property(u => u.RegisteredAt)
-            .HasColumnName("registered_at")
-            .HasDefaultValueSql("now()");
+            builder.Property(u => u.SubscriptionEndDate)
+                .HasColumnName("subscriptionenddate")  // â† Ð”ÐžÐ‘ÐÐ’Ð˜Ð›!
+                .HasColumnType("timestamp");
 
-        b.Property(u => u.LastActivityAt)
-            .HasColumnName("last_activity_at");
+            builder.HasIndex(u => u.Username)
+                .HasDatabaseName("idx_users_username");
+
+            builder.HasIndex(u => new { u.SubscriptionStatus, u.SubscriptionEndDate })
+                .HasDatabaseName("idx_users_subscription");
+        }
     }
 }

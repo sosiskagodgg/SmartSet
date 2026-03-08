@@ -23,6 +23,8 @@ public class CommandOrchestrator
         _logger = logger;
     }
 
+    // FitnessTracker.AI.Core.Orchestration/CommandOrchestrator.cs
+
     public async Task<CommandResult> ProcessAsync(
         string message,
         long userId,
@@ -69,7 +71,8 @@ public class CommandOrchestrator
 
                 if (missingRequired.Any())
                 {
-                    var missingDescriptions = missingRequired.Select(e => e.Description);
+                    // Используем DisplayName вместо Description
+                    var missingDescriptions = missingRequired.Select(e => e.DisplayName);
                     return CommandResult.NeedMoreInfo(
                         $"Пожалуйста, укажи: {string.Join(", ", missingDescriptions)}",
                         missingRequired
@@ -81,7 +84,7 @@ public class CommandOrchestrator
             var result = await command.ExecuteAsync(context, cancellationToken);
 
             _logger.LogInformation("Command {CommandName} executed with success: {IsSuccess}",
-                command.Name, result.IsSuccess); // Success -> IsSuccess
+                command.Name, result.IsSuccess);
 
             return result;
         }

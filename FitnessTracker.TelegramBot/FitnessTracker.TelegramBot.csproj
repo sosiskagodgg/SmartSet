@@ -1,39 +1,33 @@
-﻿<!-- FitnessTracker.TelegramBot.csproj -->
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+﻿
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
-		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<OutputType>Exe</OutputType>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- Telegram.Bot (совместим с .NET 8) -->
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
 		<PackageReference Include="Telegram.Bot" Version="22.9.5.2" />
-
-		<!-- Microsoft пакеты - обновляем до 10.0.3 как в AI -->
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.3" />
+		<PackageReference Include="Scrutor" Version="4.2.2" />
 	</ItemGroup>
 
-	<!-- Ссылки на другие проекты -->
 	<ItemGroup>
 		<ProjectReference Include="..\FitnessTracker.Application\FitnessTracker.Application.csproj" />
-		<ProjectReference Include="..\FitnessTracker.Infrastructure\FitnessTracker.Infrastructure.csproj" />
-		<ProjectReference Include="..\FitnessTracker.Domain\FitnessTracker.Domain.csproj" />
 		<ProjectReference Include="..\FitnessTracker.AI\FitnessTracker.AI.csproj" />
+		<ProjectReference Include="..\FitnessTracker.Domain\FitnessTracker.Domain.csproj" />
+		<ProjectReference Include="..\FitnessTracker.Infrastructure\FitnessTracker.Infrastructure.csproj" />
 	</ItemGroup>
 
-	<!-- Папки для хендлеров -->
 	<ItemGroup>
-		<Folder Include="Handlers\Callbacks\" />
-		<Folder Include="Handlers\Messages\" />
-		<Folder Include="Handlers\States\" />
+		<None Update="appsettings.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 </Project>

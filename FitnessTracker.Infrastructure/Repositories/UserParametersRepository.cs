@@ -1,20 +1,27 @@
 ﻿// FitnessTracker.Infrastructure/Repositories/UserParametersRepository.cs
+using Microsoft.EntityFrameworkCore;
 using FitnessTracker.Domain.Entities;
 using FitnessTracker.Domain.Interfaces;
 using FitnessTracker.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace FitnessTracker.Infrastructure.Repositories;
 
 /// <summary>
-/// Репозиторий для работы с параметрами пользователя
+/// Реализация репозитория для работы с параметрами пользователя
 /// </summary>
-public class UserParametersRepository : BaseRepository<UserParameters>, IUserParametersRepository
+public class UserParametersRepository : BaseRepository<UserParameters, long>, IUserParametersRepository
 {
     public UserParametersRepository(FitnessDbContext context) : base(context)
     {
     }
 
-    // Специфичные методы можно добавить позже при необходимости
-    // Например, получение истории изменений параметров, если будет отдельная таблица
+    /// <inheritdoc />
+    public async Task<UserParameters?> GetByTelegramIdAsync(long telegramId, CancellationToken cancellationToken = default)
+    {
+        return await DbSet
+            .FirstOrDefaultAsync(up => up.Id == telegramId, cancellationToken);
+    }
+
+    // Все базовые методы (GetByIdAsync, GetAllAsync, AddAsync, UpdateAsync, DeleteAsync, ExistsAsync)
+    // наследуются от BaseRepository<UserParameters, long>
 }

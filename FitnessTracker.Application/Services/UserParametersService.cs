@@ -1,25 +1,39 @@
 ﻿// FitnessTracker.Application/Services/UserParametersService.cs
+using FitnessTracker.Application.Common.Exceptions;
+using FitnessTracker.Application.Common.Interfaces;
+using FitnessTracker.Application.Interfaces;
 using FitnessTracker.Domain.Entities;
 using FitnessTracker.Domain.Interfaces;
-using FitnessTracker.Application.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace FitnessTracker.Application.Services;
 
+/// <summary>
+/// Сервис для работы с параметрами пользователя
+/// </summary>
 public class UserParametersService : IUserParametersService
 {
-    private readonly IUserParametersRepository _userParametersRepository;
+    private readonly IUserParametersRepository _parametersRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly ILogger<UserParametersService> _logger;
 
-    public UserParametersService(IUserParametersRepository userParametersRepository)
+    public UserParametersService(
+        IUserParametersRepository parametersRepository,
+        IUserRepository userRepository,
+        ILogger<UserParametersService> logger)
     {
-        _userParametersRepository = userParametersRepository;
+        _parametersRepository = parametersRepository;
+        _userRepository = userRepository;
+        _logger = logger;
     }
 
-    public async Task<UserParameters?> GetUserParametersAsync(long telegramId, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task<UserParameters?> GetUserParametersAsync(long telegramId, CancellationToken cancellationToken = default)
     {
-        // TelegramId и есть Id в таблице
-        return await _userParametersRepository.GetByIdAsync(telegramId, ct);
+        return await _parametersRepository.GetByTelegramIdAsync(telegramId, cancellationToken);
     }
 
+    /// <inheritdoc />
     public async Task<UserParameters> CreateOrUpdateUserParametersAsync(
         long telegramId,
         int? height = null,
@@ -27,129 +41,99 @@ public class UserParametersService : IUserParametersService
         decimal? bodyFat = null,
         string? experience = null,
         string? goals = null,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
-        var existing = await GetUserParametersAsync(telegramId, ct);
+        _logger.LogInformation("Updating parameters for user {TelegramId}", telegramId);
 
-        if (existing != null)
+        var userExists = await _userRepository.ExistsByTelegramIdAsync(telegramId, cancellationToken);
+        if (!userExists)
         {
-            // Обновляем только те поля, которые переданы
-            if (height.HasValue)
-                existing.Height = height.Value;
-            if (weight.HasValue)
-                existing.Weight = weight.Value;
-            if (bodyFat.HasValue)
-                existing.BodyFat = bodyFat.Value;
-            if (experience != null)
-                existing.Experience = experience;
-            if (goals != null)
-                existing.Goals = goals;
-
-            await _userParametersRepository.UpdateAsync(existing, ct);
-            return existing;
+            _logger.LogWarning("User with TelegramId {TelegramId} not found", telegramId);
+            throw new UserNotFoundException(telegramId);
         }
 
-        // Создаем новые параметры
-        var newParameters = new UserParameters
-        {
-            TelegramId = telegramId,
-            Height = height,
-            Weight = weight,
-            BodyFat = bodyFat,
-            Experience = experience,
-            Goals = goals
-        };
+        var parameters = await _parametersRepository.GetByTelegramIdAsync(telegramId, cancellationToken);
 
-        await _userParametersRepository.AddAsync(newParameters, ct);
-        return newParameters;
-    }
-
-    public async Task UpdateHeightAsync(long telegramId, int height, CancellationToken ct = default)
-    {
-        var parameters = await GetUserParametersAsync(telegramId, ct);
         if (parameters == null)
         {
-            parameters = new UserParameters { TelegramId = telegramId, Height = height };
-            await _userParametersRepository.AddAsync(parameters, ct);
+            parameters = UserParameters.Create(telegramId);
+            ApplyUpdates(parameters, height, weight, bodyFat, experience, goals);
+            await _parametersRepository.AddAsync(parameters, cancellationToken);
+            _logger.LogInformation("Created new parameters for user {TelegramId}", telegramId);
         }
         else
         {
-            parameters.Height = height;
-            await _userParametersRepository.UpdateAsync(parameters, ct);
+            ApplyUpdates(parameters, height, weight, bodyFat, experience, goals);
+            await _parametersRepository.UpdateAsync(parameters, cancellationToken);
+            _logger.LogInformation("Updated parameters for user {TelegramId}", telegramId);
         }
+
+        return parameters;
     }
 
-    public async Task UpdateWeightAsync(long telegramId, decimal weight, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task UpdateHeightAsync(long telegramId, int height, CancellationToken cancellationToken = default)
     {
-        var parameters = await GetUserParametersAsync(telegramId, ct);
-        if (parameters == null)
-        {
-            parameters = new UserParameters { TelegramId = telegramId, Weight = weight };
-            await _userParametersRepository.AddAsync(parameters, ct);
-        }
-        else
-        {
-            parameters.Weight = weight;
-            await _userParametersRepository.UpdateAsync(parameters, ct);
-        }
+        await CreateOrUpdateUserParametersAsync(telegramId, height: height, cancellationToken: cancellationToken);
     }
 
-    public async Task UpdateBodyFatAsync(long telegramId, decimal bodyFat, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task UpdateWeightAsync(long telegramId, decimal weight, CancellationToken cancellationToken = default)
     {
-        var parameters = await GetUserParametersAsync(telegramId, ct);
-        if (parameters == null)
-        {
-            parameters = new UserParameters { TelegramId = telegramId, BodyFat = bodyFat };
-            await _userParametersRepository.AddAsync(parameters, ct);
-        }
-        else
-        {
-            parameters.BodyFat = bodyFat;
-            await _userParametersRepository.UpdateAsync(parameters, ct);
-        }
+        await CreateOrUpdateUserParametersAsync(telegramId, weight: weight, cancellationToken: cancellationToken);
     }
 
-    public async Task UpdateExperienceAsync(long telegramId, string experience, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task UpdateBodyFatAsync(long telegramId, decimal bodyFat, CancellationToken cancellationToken = default)
     {
-        var parameters = await GetUserParametersAsync(telegramId, ct);
-        if (parameters == null)
-        {
-            parameters = new UserParameters { TelegramId = telegramId, Experience = experience };
-            await _userParametersRepository.AddAsync(parameters, ct);
-        }
-        else
-        {
-            parameters.Experience = experience;
-            await _userParametersRepository.UpdateAsync(parameters, ct);
-        }
+        await CreateOrUpdateUserParametersAsync(telegramId, bodyFat: bodyFat, cancellationToken: cancellationToken);
     }
 
-    public async Task UpdateGoalsAsync(long telegramId, string goals, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task UpdateExperienceAsync(long telegramId, string experience, CancellationToken cancellationToken = default)
     {
-        var parameters = await GetUserParametersAsync(telegramId, ct);
-        if (parameters == null)
-        {
-            parameters = new UserParameters { TelegramId = telegramId, Goals = goals };
-            await _userParametersRepository.AddAsync(parameters, ct);
-        }
-        else
-        {
-            parameters.Goals = goals;
-            await _userParametersRepository.UpdateAsync(parameters, ct);
-        }
+        await CreateOrUpdateUserParametersAsync(telegramId, experience: experience, cancellationToken: cancellationToken);
     }
 
-    public async Task<bool> UserParametersExistsAsync(long telegramId, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task UpdateGoalsAsync(long telegramId, string goals, CancellationToken cancellationToken = default)
     {
-        return await _userParametersRepository.ExistsAsync(telegramId, ct);
+        await CreateOrUpdateUserParametersAsync(telegramId, goals: goals, cancellationToken: cancellationToken);
     }
 
-    public async Task DeleteUserParametersAsync(long telegramId, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task DeleteUserParametersAsync(long telegramId, CancellationToken cancellationToken = default)
     {
-        var parameters = await GetUserParametersAsync(telegramId, ct);
+        _logger.LogInformation("Deleting parameters for user {TelegramId}", telegramId);
+
+        var parameters = await _parametersRepository.GetByTelegramIdAsync(telegramId, cancellationToken);
         if (parameters != null)
         {
-            await _userParametersRepository.DeleteAsync(parameters, ct);
+            await _parametersRepository.DeleteAsync(parameters, cancellationToken);
+            _logger.LogInformation("Deleted parameters for user {TelegramId}", telegramId);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UserParametersExistsAsync(long telegramId, CancellationToken cancellationToken = default)
+    {
+        return await _parametersRepository.ExistsAsync(telegramId, cancellationToken);
+    }
+
+    private static void ApplyUpdates(
+        UserParameters parameters,
+        int? height,
+        decimal? weight,
+        decimal? bodyFat,
+        string? experience,
+        string? goals)
+    {
+        parameters.UpdatePhysicalMetrics(height, weight, bodyFat);
+
+        if (experience != null)
+            parameters.UpdateExperience(experience);
+
+        if (goals != null)
+            parameters.UpdateGoals(goals);
     }
 }

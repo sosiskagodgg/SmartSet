@@ -1,5 +1,4 @@
-﻿// FitnessTracker.AI.Core/Interfaces/IPublicService.cs
-
+﻿// FitnessTracker.AI/Core/Interfaces/IPublicService.cs
 namespace FitnessTracker.AI.Core.Interfaces;
 
 /// <summary>
@@ -7,6 +6,9 @@ namespace FitnessTracker.AI.Core.Interfaces;
 /// </summary>
 public interface IPublicService
 {
+    /// <summary>
+    /// Имя сервиса (уникальное)
+    /// </summary>
     string ServiceName { get; }
 }
 
@@ -15,6 +17,9 @@ public interface IPublicService
 /// </summary>
 public interface IPublicService<in TRequest, TResponse> : IPublicService
 {
+    /// <summary>
+    /// Выполнить сервис
+    /// </summary>
     Task<TResponse> ExecuteAsync(TRequest request, CancellationToken cancellationToken = default);
 }
 
@@ -25,4 +30,7 @@ public interface IPublicService<TResponse> : IPublicService<EmptyRequest, TRespo
 {
 }
 
-public class EmptyRequest { }
+/// <summary>
+/// Пустой запрос для сервисов без параметров
+/// </summary>
+public record EmptyRequest();

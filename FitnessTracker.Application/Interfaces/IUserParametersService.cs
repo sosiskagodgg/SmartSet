@@ -1,18 +1,33 @@
 ﻿// FitnessTracker.Application/Interfaces/IUserParametersService.cs
+using FitnessTracker.Application.Common.Interfaces;
 using FitnessTracker.Domain.Entities;
 
 namespace FitnessTracker.Application.Interfaces;
 
-public interface IUserParametersService : IService
+/// <summary>
+/// Сервис для работы с параметрами пользователя
+/// </summary>
+public interface IUserParametersService : IApplicationService
 {
     /// <summary>
     /// Получить параметры пользователя по TelegramId
     /// </summary>
-    Task<UserParameters?> GetUserParametersAsync(long telegramId, CancellationToken ct = default);
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Параметры пользователя или null, если не найдены</returns>
+    Task<UserParameters?> GetUserParametersAsync(long telegramId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Создать или обновить параметры пользователя
     /// </summary>
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="height">Рост в см (опционально)</param>
+    /// <param name="weight">Вес в кг (опционально)</param>
+    /// <param name="bodyFat">Процент жира (опционально)</param>
+    /// <param name="experience">Уровень опыта (опционально)</param>
+    /// <param name="goals">Цели (опционально)</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Обновленные параметры пользователя</returns>
     Task<UserParameters> CreateOrUpdateUserParametersAsync(
         long telegramId,
         int? height = null,
@@ -20,24 +35,60 @@ public interface IUserParametersService : IService
         decimal? bodyFat = null,
         string? experience = null,
         string? goals = null,
-        CancellationToken ct = default);
+        CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Обновить конкретное поле параметров
+    /// Обновить рост пользователя
     /// </summary>
-    Task UpdateHeightAsync(long telegramId, int height, CancellationToken ct = default);
-    Task UpdateWeightAsync(long telegramId, decimal weight, CancellationToken ct = default);
-    Task UpdateBodyFatAsync(long telegramId, decimal bodyFat, CancellationToken ct = default);
-    Task UpdateExperienceAsync(long telegramId, string experience, CancellationToken ct = default);
-    Task UpdateGoalsAsync(long telegramId, string goals, CancellationToken ct = default);
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="height">Рост в см</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    Task UpdateHeightAsync(long telegramId, int height, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Проверить, есть ли параметры у пользователя
+    /// Обновить вес пользователя
     /// </summary>
-    Task<bool> UserParametersExistsAsync(long telegramId, CancellationToken ct = default);
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="weight">Вес в кг</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    Task UpdateWeightAsync(long telegramId, decimal weight, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Обновить процент жира
+    /// </summary>
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="bodyFat">Процент жира</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    Task UpdateBodyFatAsync(long telegramId, decimal bodyFat, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Обновить уровень опыта
+    /// </summary>
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="experience">Уровень опыта (beginner/intermediate/advanced)</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    Task UpdateExperienceAsync(long telegramId, string experience, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Обновить цели пользователя
+    /// </summary>
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="goals">Цели в свободном формате</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    Task UpdateGoalsAsync(long telegramId, string goals, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Удалить параметры пользователя
     /// </summary>
-    Task DeleteUserParametersAsync(long telegramId, CancellationToken ct = default);
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    Task DeleteUserParametersAsync(long telegramId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Проверить наличие параметров у пользователя
+    /// </summary>
+    /// <param name="telegramId">Telegram ID пользователя</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>true если параметры существуют</returns>
+    Task<bool> UserParametersExistsAsync(long telegramId, CancellationToken cancellationToken = default);
 }

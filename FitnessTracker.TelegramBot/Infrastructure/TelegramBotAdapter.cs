@@ -1,13 +1,16 @@
-﻿using FitnessTracker.TelegramBot.Abstractions;
-using FitnessTracker.TelegramBot.Models;
+﻿// FitnessTracker.TelegramBot/Infrastructure/TelegramBotAdapter.cs
+using Microsoft.Extensions.Logging;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
+using FitnessTracker.TelegramBot.Abstractions;
+using FitnessTracker.TelegramBot.Models;
+using TelegramChatAction = Telegram.Bot.Types.Enums.ChatAction; // Алиас для Telegram
 
 namespace FitnessTracker.TelegramBot.Infrastructure;
 
 /// <summary>
-/// Адаптер для Telegram API (единственное место, где используется Telegram.Bot)
+/// Адаптер для Telegram API (единственное место с Telegram.Bot)
 /// </summary>
 public class TelegramBotAdapter : ITelegramBotAdapter
 {
@@ -26,27 +29,17 @@ public class TelegramBotAdapter : ITelegramBotAdapter
         long userId,
         string text,
         Keyboard? keyboard = null,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
-        try
-        {
-            _logger.LogDebug("Sending message to user {UserId}", userId);
+        var message = await _botClient.SendMessage(
+            chatId: userId,
+            text: text,
+            parseMode: ParseMode.Html,
+            replyMarkup: ToTelegramKeyboard(keyboard),
+            cancellationToken: cancellationToken
+        );
 
-            var message = await _botClient.SendMessage(
-                chatId: userId,
-                text: text,
-                parseMode: ParseMode.Html,
-                replyMarkup: ToTelegramKeyboard(keyboard),
-                cancellationToken: ct
-            );
-
-            return message.MessageId;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to send message to user {UserId}", userId);
-            throw;
-        }
+        return message.MessageId;
     }
 
     public async Task<int> EditMessageAsync(
@@ -54,88 +47,92 @@ public class TelegramBotAdapter : ITelegramBotAdapter
         int messageId,
         string text,
         Keyboard? keyboard = null,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
-        try
-        {
-            _logger.LogDebug("Editing message {MessageId} for user {UserId}", messageId, userId);
+        var message = await _botClient.EditMessageText(
+            chatId: userId,
+            messageId: messageId,
+            text: text,
+            parseMode: ParseMode.Html,
+            replyMarkup: ToTelegramKeyboard(keyboard),
+            cancellationToken: cancellationToken
+        );
 
-            var message = await _botClient.EditMessageText(
-                chatId: userId,
-                messageId: messageId,
-                text: text,
-                parseMode: ParseMode.Html,
-                replyMarkup: ToTelegramKeyboard(keyboard),
-                cancellationToken: ct
-            );
-
-            return message.MessageId;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to edit message {MessageId} for user {UserId}", messageId, userId);
-            throw;
-        }
+        return message.MessageId;
     }
 
     public async Task AnswerCallbackAsync(
         string callbackQueryId,
         string? text = null,
         bool showAlert = false,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
-        try
-        {
-            _logger.LogDebug("Answering callback {CallbackId}", callbackQueryId);
-
-            await _botClient.AnswerCallbackQuery(
-                callbackQueryId: callbackQueryId,
-                text: text,
-                showAlert: showAlert,
-                cancellationToken: ct
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to answer callback {CallbackId}", callbackQueryId);
-            throw;
-        }
+        await _botClient.AnswerCallbackQuery(
+            callbackQueryId: callbackQueryId,
+            text: text,
+            showAlert: showAlert,
+            cancellationToken: cancellationToken
+        );
     }
 
     public async Task DeleteMessageAsync(
         long userId,
         int messageId,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
-        try
-        {
-            _logger.LogDebug("Deleting message {MessageId} for user {UserId}", messageId, userId);
+        await _botClient.DeleteMessage(
+            chatId: userId,
+            messageId: messageId,
+            cancellationToken: cancellationToken
+        );
+    }
 
-            await _botClient.DeleteMessage(
-                chatId: userId,
-                messageId: messageId,
-                cancellationToken: ct
-            );
-        }
-        catch (Exception ex)
+    public async Task SendChatActionAsync(
+        long userId,
+        BotChatAction action,
+        CancellationToken cancellationToken = default)
+    {
+        var telegramAction = action switch
         {
-            _logger.LogError(ex, "Failed to delete message {MessageId} for user {UserId}", messageId, userId);
-            throw;
-        }
+            BotChatAction.Typing => TelegramChatAction.Typing,
+            BotChatAction.UploadPhoto => TelegramChatAction.UploadPhoto,
+            BotChatAction.UploadVideo => TelegramChatAction.UploadVideo,
+            BotChatAction.UploadDocument => TelegramChatAction.UploadDocument,
+            _ => TelegramChatAction.Typing
+        };
+
+        await _botClient.SendChatAction(
+            userId,
+            telegramAction,
+            cancellationToken: cancellationToken
+        );
     }
 
     /// <summary>
-    /// Конвертирует нашу Keyboard в Telegram InlineKeyboardMarkup
+    /// Конвертирует нашу модель Keyboard в Telegram InlineKeyboardMarkup
     /// </summary>
     private InlineKeyboardMarkup? ToTelegramKeyboard(Keyboard? keyboard)
     {
         if (keyboard == null || keyboard.Buttons.Count == 0)
             return null;
 
-        var buttons = keyboard.Buttons.Select(row =>
-            row.Select(btn => InlineKeyboardButton.WithCallbackData(btn.Text, btn.CallbackData)).ToArray()
-        ).ToArray();
+        var rows = new List<InlineKeyboardButton[]>();
 
-        return new InlineKeyboardMarkup(buttons);
+        foreach (var row in keyboard.Buttons)
+        {
+            var buttons = new List<InlineKeyboardButton>();
+            foreach (var btn in row)
+            {
+                if (string.IsNullOrEmpty(btn.Text))
+                    continue;
+
+                buttons.Add(InlineKeyboardButton.WithCallbackData(btn.Text, btn.CallbackData));
+            }
+
+            if (buttons.Any())
+                rows.Add(buttons.ToArray());
+        }
+
+        return rows.Any() ? new InlineKeyboardMarkup(rows) : null;
     }
 }

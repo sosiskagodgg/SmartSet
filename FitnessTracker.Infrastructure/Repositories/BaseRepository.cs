@@ -1,62 +1,67 @@
 ﻿// FitnessTracker.Infrastructure/Repositories/BaseRepository.cs
+using Microsoft.EntityFrameworkCore;
+using FitnessTracker.Domain.Common;
 using FitnessTracker.Domain.Interfaces;
 using FitnessTracker.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace FitnessTracker.Infrastructure.Repositories;
 
 /// <summary>
-/// Базовая реализация репозитория с общими операциями
+/// Базовая реализация репозитория с общими CRUD операциями
 /// </summary>
-public class BaseRepository<T> : IBaseRepository<T> where T : class
+/// <typeparam name="T">Тип сущности</typeparam>
+/// <typeparam name="TId">Тип идентификатора</typeparam>
+public abstract class BaseRepository<T, TId> : IBaseRepository<T, TId>
+    where T : Entity<TId>
+    where TId : notnull
 {
-    protected readonly FitnessDbContext _context;  // ← конкретный тип, не абстрактный DbContext
-    protected readonly DbSet<T> _dbSet;
+    protected readonly FitnessDbContext Context;
+    protected readonly DbSet<T> DbSet;
 
-    public BaseRepository(FitnessDbContext context)  // ← конкретный тип в конструкторе
+    protected BaseRepository(FitnessDbContext context)
     {
-        _context = context;
-        _dbSet = context.Set<T>();
+        Context = context;
+        DbSet = context.Set<T>();
     }
 
-    public virtual async Task<T?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public virtual async Task<T?> GetByIdAsync(TId id, CancellationToken cancellationToken = default)
     {
-        return await _dbSet.FindAsync(new object[] { id }, cancellationToken);
+        return await DbSet.FindAsync(new object[] { id }, cancellationToken);
     }
 
-    public virtual async Task<List<T>> GetAllAsync(int limit = 50, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public virtual async Task<IReadOnlyList<T>> GetAllAsync(int limit = 50, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await DbSet
             .Take(limit)
             .ToListAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
+    public virtual async Task<bool> ExistsAsync(TId id, CancellationToken cancellationToken = default)
+    {
+        return await DbSet.AnyAsync(e => e.Id.Equals(id), cancellationToken);
+    }
+
+    /// <inheritdoc />
     public virtual async Task AddAsync(T entity, CancellationToken cancellationToken = default)
     {
-        await _dbSet.AddAsync(entity, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        await DbSet.AddAsync(entity, cancellationToken);
+        await Context.SaveChangesAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     public virtual async Task UpdateAsync(T entity, CancellationToken cancellationToken = default)
     {
-        _dbSet.Update(entity);
-        await _context.SaveChangesAsync(cancellationToken);
+        DbSet.Update(entity);
+        await Context.SaveChangesAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     public virtual async Task DeleteAsync(T entity, CancellationToken cancellationToken = default)
     {
-        _dbSet.Remove(entity);
-        await _context.SaveChangesAsync(cancellationToken);
-    }
-
-    public virtual async Task<bool> ExistsAsync(long id, CancellationToken cancellationToken = default)
-    {
-        var entity = await GetByIdAsync(id, cancellationToken);
-        return entity != null;
+        DbSet.Remove(entity);
+        await Context.SaveChangesAsync(cancellationToken);
     }
 }

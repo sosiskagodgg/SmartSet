@@ -1,52 +1,50 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿// FitnessTracker.Infrastructure/Data/Configurations/UserParametersConfiguration.cs
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using FitnessTracker.Domain.Entities;
 
-namespace FitnessTracker.Infrastructure.Data.Configurations
+namespace FitnessTracker.Infrastructure.Data.Configurations;
+
+public class UserParametersConfiguration : IEntityTypeConfiguration<UserParameters>
 {
-    public class UserParametersConfiguration : IEntityTypeConfiguration<UserParameters>
+    public void Configure(EntityTypeBuilder<UserParameters> builder)
     {
-        public void Configure(EntityTypeBuilder<UserParameters> builder)
-        {
-            builder.ToTable("userparameters");
+        // Имя таблицы в нижнем регистре
+        builder.ToTable("userparameters");
 
-            builder.HasKey(up => up.TelegramId);
+        // Первичный ключ
+        builder.HasKey(up => up.Id);
 
-            builder.Property(up => up.TelegramId)
-                .HasColumnName("telegramid")  // ← ДОБАВИЛ!
-                .IsRequired()
-                .ValueGeneratedNever();
+        // Настройка колонок - ВСЕ В НИЖНЕМ РЕГИСТРЕ
+        builder.Property(up => up.Id)
+            .HasColumnName("telegramid")  // нижний регистр
+            .ValueGeneratedNever()
+            .IsRequired();
 
-            builder.Property(up => up.Height)
-                .HasColumnName("height")      // ← ДОБАВИЛ!
-                .IsRequired(false);
+        builder.Property(up => up.Height)
+            .HasColumnName("height")      // нижний регистр
+            .HasColumnType("integer");
 
-            builder.Property(up => up.Weight)
-                .HasColumnName("weight")      // ← ДОБАВИЛ!
-                .IsRequired(false)
-                .HasPrecision(5, 2);
+        builder.Property(up => up.Weight)
+            .HasColumnName("weight")      // нижний регистр
+            .HasPrecision(5, 2);
 
-            builder.Property(up => up.BodyFat)
-                .HasColumnName("bodyfat")     // ← ДОБАВИЛ!
-                .IsRequired(false)
-                .HasPrecision(4, 1);
+        builder.Property(up => up.BodyFat)
+            .HasColumnName("bodyfat")     // нижний регистр
+            .HasPrecision(4, 1);
 
-            builder.Property(up => up.Experience)
-                .HasColumnName("experience")  // ← ДОБАВИЛ!
-                .IsRequired(false)
-                .HasMaxLength(50);
+        builder.Property(up => up.Experience)
+            .HasColumnName("experience")  // нижний регистр
+            .HasMaxLength(50);
 
-            builder.Property(up => up.Goals)
-                .HasColumnName("goals")       // ← ДОБАВИЛ!
-                .IsRequired(false);
+        builder.Property(up => up.Goals)
+            .HasColumnName("goals");      // нижний регистр
 
-            builder.HasOne<User>()
-                .WithOne()
-                .HasForeignKey<UserParameters>(up => up.TelegramId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            builder.HasIndex(up => up.TelegramId)
-                .HasDatabaseName("idx_userparameters_telegram");
-        }
+        // Связь с users
+        builder.HasOne<User>()
+            .WithOne()
+            .HasForeignKey<UserParameters>(up => up.Id)
+            .HasConstraintName("fk_userparameters_telegramid")
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

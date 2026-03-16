@@ -1,71 +1,136 @@
-﻿using FitnessTracker.Domain.Entities;
-using FitnessTracker.Domain.Interfaces;
+﻿// FitnessTracker.Application/Services/UserWorkoutService.cs
+using FitnessTracker.Application.Common.Exceptions;
+using FitnessTracker.Application.Common.Interfaces;
 using FitnessTracker.Application.Interfaces;
+using FitnessTracker.Domain.Entities;
+using FitnessTracker.Domain.Entities.Exercises;
+using FitnessTracker.Domain.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace FitnessTracker.Application.Services;
 
+/// <summary>
+/// Сервис для работы с тренировками пользователя (шаблонами)
+/// </summary>
 public class UserWorkoutService : IUserWorkoutService
 {
     private readonly IUserWorkoutRepository _userWorkoutRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly ILogger<UserWorkoutService> _logger;
 
-    public UserWorkoutService(IUserWorkoutRepository userWorkoutRepository)
+    public UserWorkoutService(
+        IUserWorkoutRepository userWorkoutRepository,
+        IUserRepository userRepository,
+        ILogger<UserWorkoutService> logger)
     {
         _userWorkoutRepository = userWorkoutRepository;
+        _userRepository = userRepository;
+        _logger = logger;
     }
 
-    public async Task<UserWorkout?> GetUserWorkoutAsync(User user, int dayNumber, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task<UserWorkout?> GetUserWorkoutAsync(long telegramId, int dayNumber, CancellationToken cancellationToken = default)
     {
-        var allWorkouts = await _userWorkoutRepository.GetAllAsync(int.MaxValue, ct);
-        return allWorkouts.FirstOrDefault(w => w.TelegramId == user.TelegramId && w.DayNumber == dayNumber);
+        return await _userWorkoutRepository.GetByIdAsync(telegramId, dayNumber, cancellationToken);
     }
 
-    public async Task<List<UserWorkout>> GetAllUserWorkoutsAsync(User user, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<UserWorkout>> GetAllUserWorkoutsAsync(long telegramId, CancellationToken cancellationToken = default)
     {
-        var allWorkouts = await _userWorkoutRepository.GetAllAsync(int.MaxValue, ct);
-        return allWorkouts
-            .Where(w => w.TelegramId == user.TelegramId)
-            .OrderBy(w => w.DayNumber)
-            .ToList();
+        return await _userWorkoutRepository.GetByTelegramIdAsync(telegramId, cancellationToken);
     }
 
-    public async Task<UserWorkout> CreateOrUpdateUserWorkoutAsync(User user, int dayNumber, string name, List<Exercise> exercises, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task<UserWorkout> CreateUserWorkoutAsync(
+        long telegramId,
+        int dayNumber,
+        string name,
+        IEnumerable<Exercise> exercises,
+        CancellationToken cancellationToken = default)
     {
-        var existing = await GetUserWorkoutAsync(user, dayNumber, ct);
+        _logger.LogInformation("Creating workout for user {TelegramId} on day {DayNumber}", telegramId, dayNumber);
 
-        if (existing != null)
+        var userExists = await _userRepository.ExistsByTelegramIdAsync(telegramId, cancellationToken);
+        if (!userExists)
         {
-            existing.Name = name;
-            existing.Exercises = exercises;
-            await _userWorkoutRepository.UpdateAsync(existing, ct);
-            return existing;
+            _logger.LogWarning("User with TelegramId {TelegramId} not found", telegramId);
+            throw new UserNotFoundException(telegramId);
         }
 
-        var newWorkout = new UserWorkout
+        var existing = await _userWorkoutRepository.ExistsAsync(telegramId, dayNumber, cancellationToken);
+        if (existing)
         {
-            TelegramId = user.TelegramId,
-            DayNumber = dayNumber,
-            Name = name,
-            Exercises = exercises
-        };
+            _logger.LogWarning("Workout for user {TelegramId} on day {DayNumber} already exists", telegramId, dayNumber);
+            throw new UserWorkoutAlreadyExistsException(telegramId, dayNumber);
+        }
 
-        await _userWorkoutRepository.AddAsync(newWorkout, ct);
-        return newWorkout;
+        var workout = UserWorkout.Create(telegramId, dayNumber, name, exercises);
+        await _userWorkoutRepository.AddAsync(workout, cancellationToken);
+
+        _logger.LogInformation("Workout created for user {TelegramId} on day {DayNumber}", telegramId, dayNumber);
+        return workout;
     }
 
-    public async Task AddExerciseToUserWorkoutAsync(UserWorkout userWorkout, Exercise exercise, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task<UserWorkout> UpdateUserWorkoutAsync(
+        long telegramId,
+        int dayNumber,
+        string name,
+        IEnumerable<Exercise> exercises,
+        CancellationToken cancellationToken = default)
     {
-        userWorkout.Exercises.Add(exercise);
-        await _userWorkoutRepository.UpdateAsync(userWorkout, ct);
+        _logger.LogInformation("Updating workout for user {TelegramId} on day {DayNumber}", telegramId, dayNumber);
+
+        var workout = await _userWorkoutRepository.GetByIdAsync(telegramId, dayNumber, cancellationToken);
+        if (workout == null)
+        {
+            _logger.LogWarning("Workout for user {TelegramId} on day {DayNumber} not found", telegramId, dayNumber);
+            throw new UserWorkoutNotFoundException(telegramId, dayNumber);
+        }
+
+        if (workout.Name != name)
+            workout.Rename(name);
+
+        workout.UpdateExercises(exercises);
+        await _userWorkoutRepository.UpdateAsync(workout, cancellationToken);
+
+        _logger.LogInformation("Workout updated for user {TelegramId} on day {DayNumber}", telegramId, dayNumber);
+        return workout;
     }
 
-    public async Task RemoveExerciseFromUserWorkoutAsync(UserWorkout userWorkout, Exercise exercise, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task<UserWorkout> CreateOrUpdateUserWorkoutAsync(
+        long telegramId,
+        int dayNumber,
+        string name,
+        IEnumerable<Exercise> exercises,
+        CancellationToken cancellationToken = default)
     {
-        userWorkout.Exercises.Remove(exercise);
-        await _userWorkoutRepository.UpdateAsync(userWorkout, ct);
+        var existing = await _userWorkoutRepository.ExistsAsync(telegramId, dayNumber, cancellationToken);
+        return existing
+            ? await UpdateUserWorkoutAsync(telegramId, dayNumber, name, exercises, cancellationToken)
+            : await CreateUserWorkoutAsync(telegramId, dayNumber, name, exercises, cancellationToken);
     }
 
-    public async Task DeleteUserWorkoutAsync(UserWorkout userWorkout, CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task DeleteUserWorkoutAsync(long telegramId, int dayNumber, CancellationToken cancellationToken = default)
     {
-        await _userWorkoutRepository.DeleteAsync(userWorkout, ct);
+        _logger.LogInformation("Deleting workout for user {TelegramId} on day {DayNumber}", telegramId, dayNumber);
+
+        var workout = await _userWorkoutRepository.GetByIdAsync(telegramId, dayNumber, cancellationToken);
+        if (workout == null)
+        {
+            _logger.LogWarning("Workout for user {TelegramId} on day {DayNumber} not found", telegramId, dayNumber);
+            throw new UserWorkoutNotFoundException(telegramId, dayNumber);
+        }
+
+        await _userWorkoutRepository.DeleteAsync(telegramId, dayNumber, cancellationToken);
+        _logger.LogInformation("Workout deleted for user {TelegramId} on day {DayNumber}", telegramId, dayNumber);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UserWorkoutExistsAsync(long telegramId, int dayNumber, CancellationToken cancellationToken = default)
+    {
+        return await _userWorkoutRepository.ExistsAsync(telegramId, dayNumber, cancellationToken);
     }
 }

@@ -1,5 +1,4 @@
-﻿// FitnessTracker.AI.Services.Base/PublicServiceBase.cs
-
+﻿// FitnessTracker.AI/Services/Base/PublicServiceBase.cs
 using Microsoft.Extensions.Logging;
 using FitnessTracker.AI.Core.Interfaces;
 
@@ -12,7 +11,6 @@ namespace FitnessTracker.AI.Services.Base;
 public abstract class PublicServiceBase<TRequest, TResponse> : IPublicService<TRequest, TResponse>
 {
     protected readonly ILogger Logger;
-
     public abstract string ServiceName { get; }
 
     protected PublicServiceBase(ILogger logger)

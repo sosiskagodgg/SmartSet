@@ -1,5 +1,4 @@
-﻿// FitnessTracker.AI.Core/Attributes/PublicServiceAttribute.cs
-
+﻿// FitnessTracker.AI/Core/Attributes/PublicServiceAttribute.cs
 namespace FitnessTracker.AI.Core.Attributes;
 
 /// <summary>

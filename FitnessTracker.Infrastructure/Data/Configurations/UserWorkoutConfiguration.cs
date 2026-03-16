@@ -1,9 +1,10 @@
 ﻿// FitnessTracker.Infrastructure/Data/Configurations/UserWorkoutConfiguration.cs
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using FitnessTracker.Domain.Entities;
 using FitnessTracker.Domain.Entities.Exercises;
 using FitnessTracker.Infrastructure.Data.Converters;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System.Text.Json;
 
 namespace FitnessTracker.Infrastructure.Data.Configurations;
@@ -33,23 +34,18 @@ public class UserWorkoutConfiguration : IEntityTypeConfiguration<UserWorkout>
             .IsRequired()
             .HasMaxLength(255);
 
-        // ИСПРАВЛЕНО: добавляем конвертер для DateTime
+        // ИСПРАВЛЕНО: timestamp with time zone
         builder.Property(uw => uw.CreatedAt)
             .HasColumnName("createdat")
-            .HasColumnType("timestamp without time zone")
-            .HasConversion(
-                v => v,
-                v => DateTime.SpecifyKind(v, DateTimeKind.Utc)
-            )
+            .HasColumnType("timestamp with time zone")
+            .HasConversion<UtcDateTimeConverter>()
             .IsRequired();
 
+        // ИСПРАВЛЕНО: timestamp with time zone для nullable поля
         builder.Property(uw => uw.LastModified)
             .HasColumnName("lastmodified")
-            .HasColumnType("timestamp without time zone")
-            .HasConversion(
-                v => v,
-                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : (DateTime?)null
-            );
+            .HasColumnType("timestamp with time zone")
+            .HasConversion<UtcNullableDateTimeConverter>();
 
         // Настройка JSON сериализации для Exercises
         var jsonOptions = new JsonSerializerOptions
@@ -59,13 +55,19 @@ public class UserWorkoutConfiguration : IEntityTypeConfiguration<UserWorkout>
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
+        // Добавляем ValueComparer для отслеживания изменений в коллекции
+        var exercisesComparer = new ValueComparer<List<Exercise>>(
+            (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
+            c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+            c => c.ToList());
+
         builder.Property(uw => uw.Exercises)
             .HasColumnName("exercises")
             .HasColumnType("jsonb")
             .HasConversion(
                 v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<Exercise>>(v, jsonOptions) ?? new()
-            );
+                v => JsonSerializer.Deserialize<List<Exercise>>(v, jsonOptions) ?? new())
+            .Metadata.SetValueComparer(exercisesComparer);
 
         builder.HasIndex(uw => new { uw.TelegramId, uw.DayNumber })
             .HasDatabaseName("idx_userworkouts_telegram_day")

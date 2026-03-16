@@ -1,8 +1,9 @@
 ﻿// FitnessTracker.Infrastructure/Repositories/BaseRepository.cs
-using Microsoft.EntityFrameworkCore;
 using FitnessTracker.Domain.Common;
+using FitnessTracker.Domain.Entities;
 using FitnessTracker.Domain.Interfaces;
 using FitnessTracker.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace FitnessTracker.Infrastructure.Repositories;
 
@@ -47,8 +48,19 @@ public abstract class BaseRepository<T, TId> : IBaseRepository<T, TId>
     /// <inheritdoc />
     public virtual async Task AddAsync(T entity, CancellationToken cancellationToken = default)
     {
+        Console.WriteLine($"[BaseRepository] Adding entity of type {typeof(T).Name}");
+        Console.WriteLine($"[BaseRepository] Entity Id: {entity.Id}");
+
+        if (entity is User user)
+        {
+            Console.WriteLine($"[BaseRepository] User CreatedAt: {user.CreatedAt}, Kind: {user.CreatedAt.Kind}");
+            Console.WriteLine($"[BaseRepository] User UpdatedAt: {user.UpdatedAt}, Kind: {user.UpdatedAt.Kind}");
+        }
+
         await DbSet.AddAsync(entity, cancellationToken);
         await Context.SaveChangesAsync(cancellationToken);
+
+        Console.WriteLine($"[BaseRepository] Entity added successfully");
     }
 
     /// <inheritdoc />

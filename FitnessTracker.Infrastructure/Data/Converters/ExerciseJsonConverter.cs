@@ -2,6 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FitnessTracker.Domain.Entities.Exercises;
+using FitnessTracker.Domain.Enums;
 
 namespace FitnessTracker.Infrastructure.Data.Converters;
 
@@ -12,7 +13,6 @@ public class ExerciseJsonConverter : JsonConverter<Exercise>
         return typeof(Exercise).IsAssignableFrom(typeToConvert);
     }
 
-    // FitnessTracker.Infrastructure/Data/Converters/ExerciseJsonConverter.cs
     public override Exercise? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         using var jsonDoc = JsonDocument.ParseValue(ref reader);
@@ -42,7 +42,7 @@ public class ExerciseJsonConverter : JsonConverter<Exercise>
             throw new JsonException("Missing type discriminator and cannot infer exercise type");
         }
 
-        var typeName = typeProperty.GetString()?.ToLower();
+        var typeName = typeProperty.GetString()?.ToLowerInvariant();
 
         return typeName switch
         {
@@ -61,18 +61,55 @@ public class ExerciseJsonConverter : JsonConverter<Exercise>
         // Записываем дискриминатор типа
         writer.WriteString("type", value.Type.ToString().ToLowerInvariant());
 
-        // Записываем все свойства через рефлексию
-        foreach (var prop in value.GetType().GetProperties())
+        // Записываем свойства в зависимости от типа
+        switch (value)
         {
-            if (prop.Name == "Type") continue; // Пропускаем Type, мы его уже записали
+            case StrengthExercise s:
+                writer.WriteNumber("sets", s.Sets);
+                writer.WriteNumber("reps", s.Reps);
+                if (s.Weight != null)
+                    writer.WriteNumber("weight", (double)s.Weight.Kilograms);
+                writer.WriteString("muscleGroup", s.MuscleGroup);
+                writer.WriteNumber("strengthExerciseType", (int)s.StrengthExerciseType);
+                writer.WriteNumber("equipment", (int)s.Equipment);
+                break;
 
-            var propValue = prop.GetValue(value);
-            if (propValue != null)
-            {
-                writer.WritePropertyName(options?.PropertyNamingPolicy?.ConvertName(prop.Name) ?? prop.Name);
-                JsonSerializer.Serialize(writer, propValue, prop.PropertyType, options);
-            }
+            case RunningExercise r:
+                writer.WriteNumber("durationMinutes", r.DurationMinutes);
+                if (r.DistanceKm.HasValue)
+                    writer.WriteNumber("distanceKm", r.DistanceKm.Value);
+                if (r.AvgHeartRate.HasValue)
+                    writer.WriteNumber("avgHeartRate", r.AvgHeartRate.Value);
+                if (r.Pace.HasValue)
+                    writer.WriteNumber("pace", r.Pace.Value);
+                writer.WriteNumber("cardioIntensity", (int)r.Intensity);
+                writer.WriteNumber("runningSurface", (int)r.Surface);
+                if (r.ElevationGain.HasValue)
+                    writer.WriteNumber("elevationGain", r.ElevationGain.Value);
+                break;
+
+            case CardioExercise c:
+                writer.WriteNumber("durationMinutes", c.DurationMinutes);
+                if (c.DistanceKm.HasValue)
+                    writer.WriteNumber("distanceKm", c.DistanceKm.Value);
+                if (c.AvgHeartRate.HasValue)
+                    writer.WriteNumber("avgHeartRate", c.AvgHeartRate.Value);
+                writer.WriteNumber("cardioIntensity", (int)c.Intensity);
+                writer.WriteNumber("cardioType", (int)c.CardioType);
+                break;
+
+            case StaticExercise st:
+                writer.WriteNumber("holdSeconds", st.HoldSeconds);
+                writer.WriteNumber("sets", st.Sets);
+                writer.WriteNumber("staticType", (int)st.StaticType);
+                break;
         }
+
+        // Общие свойства
+        writer.WriteString("name", value.Name);
+        if (!string.IsNullOrEmpty(value.Description))
+            writer.WriteString("description", value.Description);
+        writer.WriteNumber("met", value.MET);
 
         writer.WriteEndObject();
     }

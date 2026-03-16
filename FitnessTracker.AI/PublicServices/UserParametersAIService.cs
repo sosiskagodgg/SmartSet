@@ -33,6 +33,7 @@ public class UserParametersAIService
     /// <summary>
     /// ✨ БЫСТРЫЙ МЕТОД: сразу обновить параметры, минуя классификацию
     /// </summary>
+
     public async Task<string> UpdateParametersDirectAsync(
         long telegramId,
         string message,
@@ -48,34 +49,60 @@ public class UserParametersAIService
         {
             // Извлекаем параметры через AI
             var extractionPrompt = $@"
-Извлеки параметры пользователя из сообщения.
+Извлеки параметры пользователя из сообщения на русском языке.
 
 Сообщение: {message}
 
-Доступные параметры:
-- weight: вес в кг (число)
-- height: рост в см (число)
-- bodyFat: процент жира (число)
+Доступные параметры и их возможные значения:
+- weight: вес в кг (только число, например 85)
+- height: рост в см (только число, например 190)
+- bodyFat: процент жира (только число, например 15)
 - experience: уровень опыта (beginner/intermediate/advanced)
-- goals: цели (lose_weight/gain_muscle/maintain/endurance/strength)
+- goals: цель (lose_weight/gain_muscle/maintain/endurance/strength)
 
-Верни JSON массив с type и value.
-Пример: [{{""type"":""weight"",""value"":""85""}}, {{""type"":""bodyFat"",""value"":""15""}}]
+ПРИМЕРЫ:
+Сообщение: ""мой рост 190 вес 85""
+Ответ: [{{""type"":""height"",""value"":""190""}}, {{""type"":""weight"",""value"":""85""}}]
+
+Сообщение: ""опыт продвинутый и цель набрать массу""
+Ответ: [{{""type"":""experience"",""value"":""advanced""}}, {{""type"":""goals"",""value"":""gain_muscle""}}]
+
+Сообщение: ""процент жира 15""
+Ответ: [{{""type"":""bodyFat"",""value"":""15""}}]
+
+Верни ТОЛЬКО JSON массив, без пояснений.
+Если параметр не указан, не включай его в массив.
 ";
 
-            var extractionResponse = await aiProvider.AskStructuredAsync<List<ExtractedEntity>>(
+            var extractionResponse = await aiProvider.AskStructuredAsync<List<Dictionary<string, string>>>(
                 extractionPrompt,
                 new AiOptions { Temperature = 0.1, MaxTokens = 200 },
                 cancellationToken);
 
             if (!extractionResponse.IsSuccess || extractionResponse.Data == null || !extractionResponse.Data.Any())
             {
-                return "❌ Не удалось распознать параметры. Попробуйте: 'вес 85' или 'процент жира 15'";
+                _logger.LogWarning("Failed to extract parameters from message: {Message}", message);
+                return "❌ Не удалось распознать параметры. Попробуйте: 'вес 85', 'рост 190' или 'процент жира 15'";
             }
 
-            var changes = extractionResponse.Data;
-            var updatedParams = await ApplyChangesAsync(telegramId, changes, cancellationToken);
+            _logger.LogInformation("Extracted {Count} parameters", extractionResponse.Data.Count);
 
+            var changes = new List<ExtractedEntity>();
+            foreach (var item in extractionResponse.Data)
+            {
+                if (item.TryGetValue("type", out var type) && item.TryGetValue("value", out var value))
+                {
+                    changes.Add(new ExtractedEntity { Type = type, Value = value });
+                    _logger.LogDebug("Extracted: {Type} = {Value}", type, value);
+                }
+            }
+
+            if (!changes.Any())
+            {
+                return "❌ Не удалось распознать параметры. Попробуйте указать их явно.";
+            }
+
+            var updatedParams = await ApplyChangesAsync(telegramId, changes, cancellationToken);
             return FormatSuccessResponse(updatedParams, changes);
         }
         catch (Exception ex)

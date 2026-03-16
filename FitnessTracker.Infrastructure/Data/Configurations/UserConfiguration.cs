@@ -1,9 +1,8 @@
 ﻿// FitnessTracker.Infrastructure/Data/Configurations/UserConfiguration.cs
+using FitnessTracker.Domain.Entities;
+using FitnessTracker.Infrastructure.Data.Converters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using FitnessTracker.Domain.Entities;
-
-namespace FitnessTracker.Infrastructure.Data.Configurations;
 
 public class UserConfiguration : IEntityTypeConfiguration<User>
 {
@@ -29,30 +28,24 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.SubscriptionEndDate)
             .HasColumnName("subscriptionenddate")
-            .HasColumnType("timestamp without time zone");  // Явно указываем тип
+            .HasColumnType("timestamp with time zone")  // ИЗМЕНИЛ!
+            .HasConversion<UtcNullableDateTimeConverter>();
 
         builder.Property(u => u.SubscriptionStatus)
             .HasColumnName("subscriptionstatus")
             .IsRequired()
             .HasMaxLength(50);
 
-        // ИСПРАВЛЕНО: добавляем конвертер для DateTime
         builder.Property(u => u.CreatedAt)
             .HasColumnName("createdat")
-            .HasColumnType("timestamp without time zone")
-            .HasConversion(
-                v => v,  // при записи оставляем как есть
-                v => DateTime.SpecifyKind(v, DateTimeKind.Utc)  // при чтении устанавливаем Kind=Utc
-            )
+            .HasColumnType("timestamp with time zone")  // ИЗМЕНИЛ!
+            .HasConversion<UtcDateTimeConverter>()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         builder.Property(u => u.UpdatedAt)
             .HasColumnName("updatedat")
-            .HasColumnType("timestamp without time zone")
-            .HasConversion(
-                v => v,
-                v => DateTime.SpecifyKind(v, DateTimeKind.Utc)
-            )
+            .HasColumnType("timestamp with time zone")  // ИЗМЕНИЛ!
+            .HasConversion<UtcDateTimeConverter>()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         builder.HasIndex(u => u.Username)

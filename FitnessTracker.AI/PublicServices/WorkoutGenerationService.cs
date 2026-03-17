@@ -2,12 +2,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using FitnessTracker.AI.Core.Interfaces;
-using FitnessTracker.AI.Core.Models;  // ← ДОБАВЛЕНО для AiOptions
+using FitnessTracker.AI.Core.Models;
 using FitnessTracker.Application.Interfaces;
 using FitnessTracker.Domain.Entities;
 using FitnessTracker.Domain.Entities.Exercises;
 using FitnessTracker.Domain.Enums;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace FitnessTracker.AI.PublicServices;
 
@@ -80,9 +81,20 @@ public class WorkoutGenerationService
                 },
                 ct);
 
-            if (!aiResponse.IsSuccess || aiResponse.Data == null || !aiResponse.Data.Any())
+            if (!aiResponse.IsSuccess || aiResponse.Data == null)
             {
-                _logger.LogWarning("Empty or invalid response from AI");
+                _logger.LogWarning("AI response failed: {Error}", aiResponse.Error);
+                return false;
+            }
+
+            _logger.LogInformation("AI returned {Count} days", aiResponse.Data.Count);
+
+            // СОЗДАЕМ ПРАВИЛЬНОЕ РАСПИСАНИЕ с днями отдыха
+            var workoutDays = CreateWorkoutSchedule(aiResponse.Data, daysPerWeek);
+
+            if (!workoutDays.Any())
+            {
+                _logger.LogWarning("No valid workout days after processing");
                 return false;
             }
 
@@ -94,7 +106,8 @@ public class WorkoutGenerationService
             }
 
             // Создаем новые тренировки
-            foreach (var day in aiResponse.Data)
+            int createdCount = 0;
+            foreach (var day in workoutDays)
             {
                 var exercises = ConvertToExercises(day.Exercises);
                 if (exercises.Any())
@@ -106,19 +119,138 @@ public class WorkoutGenerationService
                         $"📅 {dayName} - {GetGoalName(goal)}",
                         exercises,
                         ct);
+
+                    createdCount++;
+                    _logger.LogInformation("Created workout for day {DayNumber} ({DayName}) with {Count} exercises",
+                        day.DayNumber, dayName, exercises.Count);
                 }
             }
 
-            _logger.LogInformation("Successfully created {DaysPerWeek} workouts for user {UserId}",
-                daysPerWeek, userId);
+            _logger.LogInformation("Successfully created {CreatedCount} workouts for user {UserId}",
+                createdCount, userId);
 
-            return true;
+            return createdCount > 0;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating workout program for user {UserId}", userId);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Создает правильное расписание с днями отдыха
+    /// </summary>
+    private List<WorkoutDay> CreateWorkoutSchedule(List<WorkoutDay> aiDays, int daysPerWeek)
+    {
+        var result = new List<WorkoutDay>();
+
+        // Оптимальное расписание для разного количества дней
+        var schedule = daysPerWeek switch
+        {
+            2 => new[] { 2, 5 },           // Вторник, Пятница
+            3 => new[] { 1, 3, 5 },         // Пн, Ср, Пт
+            4 => new[] { 1, 2, 4, 6 },      // Пн, Вт, Чт, Сб
+            5 => new[] { 1, 2, 3, 5, 6 },   // Пн, Вт, Ср, Пт, Сб
+            6 => new[] { 1, 2, 3, 4, 5, 6 },// Пн-Сб, Вс отдых
+            _ => new[] { 1, 3, 5 }          // По умолчанию 3 дня
+        };
+
+        _logger.LogInformation("Creating schedule for {DaysPerWeek} days: [{Schedule}]",
+            daysPerWeek, string.Join(", ", schedule));
+
+        // Берем дни из AI ответа и распределяем по расписанию
+        for (int i = 0; i < Math.Min(schedule.Length, aiDays.Count); i++)
+        {
+            var aiDay = aiDays[i];
+            var targetDayNumber = schedule[i];
+
+            var workoutDay = new WorkoutDay
+            {
+                DayNumber = targetDayNumber,
+                Focus = aiDay.Focus ?? GetDefaultFocus(targetDayNumber),
+                Exercises = aiDay.Exercises ?? new List<ExerciseDto>()
+            };
+
+            // Если упражнений нет, создаем заглушку
+            if (workoutDay.Exercises == null || !workoutDay.Exercises.Any())
+            {
+                workoutDay.Exercises = CreateDefaultExercises(targetDayNumber);
+            }
+
+            result.Add(workoutDay);
+            _logger.LogInformation("Assigned AI day {AIIndex} to day {DayNumber} with {Count} exercises",
+                i + 1, targetDayNumber, workoutDay.Exercises.Count);
+        }
+
+        return result;
+    }
+
+    private string GetDefaultFocus(int dayNumber) => dayNumber switch
+    {
+        1 => "Грудь + Трицепс",
+        2 => "Спина + Бицепс",
+        3 => "Ноги + Плечи",
+        4 => "Грудь + Спина",
+        5 => "Плечи + Руки",
+        6 => "Ноги + Кардио",
+        7 => "Отдых",
+        _ => "Тренировка"
+    };
+
+    private List<ExerciseDto> CreateDefaultExercises(int dayNumber)
+    {
+        var exercises = new List<ExerciseDto>();
+
+        switch (dayNumber)
+        {
+            case 1: // Грудь + Трицепс
+                exercises.Add(new ExerciseDto { Name = "Жим штанги лежа", Sets = 4, Reps = 8, Weight = 60, MuscleGroup = "chest", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Жим гантелей на наклонной", Sets = 3, Reps = 10, Weight = 25, MuscleGroup = "chest", Equipment = "dumbbell" });
+                exercises.Add(new ExerciseDto { Name = "Отжимания на брусьях", Sets = 3, Reps = 10, MuscleGroup = "triceps", Equipment = "dips" });
+                exercises.Add(new ExerciseDto { Name = "Французский жим", Sets = 3, Reps = 12, Weight = 30, MuscleGroup = "triceps", Equipment = "dumbbell" });
+                break;
+
+            case 2: // Спина + Бицепс
+                exercises.Add(new ExerciseDto { Name = "Подтягивания широким хватом", Sets = 4, Reps = 8, MuscleGroup = "back", Equipment = "pull-up-bar" });
+                exercises.Add(new ExerciseDto { Name = "Тяга штанги в наклоне", Sets = 4, Reps = 8, Weight = 60, MuscleGroup = "back", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Подъем штанги на бицепс", Sets = 3, Reps = 10, Weight = 40, MuscleGroup = "biceps", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Молотковые сгибания", Sets = 3, Reps = 12, Weight = 20, MuscleGroup = "biceps", Equipment = "dumbbell" });
+                break;
+
+            case 3: // Ноги + Плечи
+                exercises.Add(new ExerciseDto { Name = "Приседания со штангой", Sets = 4, Reps = 8, Weight = 80, MuscleGroup = "legs", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Жим ногами", Sets = 4, Reps = 10, Weight = 150, MuscleGroup = "legs", Equipment = "machine" });
+                exercises.Add(new ExerciseDto { Name = "Армейский жим", Sets = 3, Reps = 8, Weight = 40, MuscleGroup = "shoulders", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Махи гантелями в стороны", Sets = 3, Reps = 12, Weight = 15, MuscleGroup = "shoulders", Equipment = "dumbbell" });
+                break;
+
+            case 4: // Грудь + Спина
+                exercises.Add(new ExerciseDto { Name = "Жим штанги лежа", Sets = 4, Reps = 8, Weight = 60, MuscleGroup = "chest", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Тяга штанги в наклоне", Sets = 4, Reps = 8, Weight = 60, MuscleGroup = "back", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Жим гантелей", Sets = 3, Reps = 10, Weight = 25, MuscleGroup = "chest", Equipment = "dumbbell" });
+                exercises.Add(new ExerciseDto { Name = "Подтягивания", Sets = 3, Reps = 8, MuscleGroup = "back", Equipment = "pull-up-bar" });
+                break;
+
+            case 5: // Плечи + Руки
+                exercises.Add(new ExerciseDto { Name = "Жим гантелей сидя", Sets = 4, Reps = 8, Weight = 25, MuscleGroup = "shoulders", Equipment = "dumbbell" });
+                exercises.Add(new ExerciseDto { Name = "Подъем штанги на бицепс", Sets = 3, Reps = 10, Weight = 40, MuscleGroup = "biceps", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Французский жим", Sets = 3, Reps = 10, Weight = 30, MuscleGroup = "triceps", Equipment = "dumbbell" });
+                exercises.Add(new ExerciseDto { Name = "Махи гантелями", Sets = 3, Reps = 12, Weight = 15, MuscleGroup = "shoulders", Equipment = "dumbbell" });
+                break;
+
+            case 6: // Ноги + Кардио
+                exercises.Add(new ExerciseDto { Name = "Приседания", Sets = 4, Reps = 10, Weight = 60, MuscleGroup = "legs", Equipment = "barbell" });
+                exercises.Add(new ExerciseDto { Name = "Выпады с гантелями", Sets = 3, Reps = 12, Weight = 20, MuscleGroup = "legs", Equipment = "dumbbell" });
+                exercises.Add(new ExerciseDto { Name = "Бег на дорожке", Sets = 1, Reps = 20, Equipment = "running", MuscleGroup = "cardio" });
+                break;
+
+            default: // Заглушка
+                exercises.Add(new ExerciseDto { Name = "Базовое упражнение", Sets = 3, Reps = 10, Weight = 40, MuscleGroup = "other", Equipment = "barbell" });
+                break;
+        }
+
+        return exercises;
     }
 
     private string BuildPrompt(
@@ -132,44 +264,31 @@ public class WorkoutGenerationService
         string gender)
     {
         return $@"
-Составь программу тренировок на основе следующих данных:
+Ты - профессиональный фитнес-тренер. Составь программу тренировок на {daysPerWeek} дней в неделю.
 
 Данные пользователя:
 - Пол: {(gender == "male" ? "мужской" : gender == "female" ? "женский" : "другой")}
 - Рост: {userParams?.Height?.ToString() ?? "не указан"} см
 - Вес: {userParams?.Weight?.ToString() ?? "не указан"} кг
-- Процент жира: {userParams?.BodyFat?.ToString() ?? "не указан"}%
-- Цель: {goal}
-- Уровень: {experience}
-- Дней в неделю: {daysPerWeek}
-- Место тренировок: {location}
-- Длительность: {durationMinutes} мин
+- Цель: {GetGoalDescription(goal)}
+- Уровень: {GetExperienceDescription(experience)}
+- Место тренировок: {GetLocationDescription(location)}
+- Длительность тренировки: {durationMinutes} минут
 
-Доступное оборудование (в зависимости от места):
-{(location switch
-        {
-            "street" => "- турник, брусья, скамья, свой вес (НЕТ: штанги, гантелей)",
-            "home" => "- гантели, резинки, свой вес (НЕТ: штанги, тренажеров)",
-            "gym" => "- всё оборудование доступно",
-            _ => "- любое оборудование"
-        })}
+Оборудование: {GetEquipmentDescription(location)}
 
 Требования к цели {goal}:
-{(goal switch
-        {
-            "strength" => "- сила: 4-6 подходов × 4-8 повторений, вес 75-85%, отдых 2-3 мин",
-            "mass" => "- масса: 3-4 подхода × 8-12 повторений, вес 65-75%, отдых 60-90 сек",
-            "weight_loss" => "- похудение: 3-4 подхода × 12-20 повторений, вес 50-60%, отдых 30-45 сек, обязательно кардио",
-            "endurance" => "- выносливость: 3-4 подхода × 15-25 повторений, вес 40-50%, отдых 30-45 сек",
-            "tone" => "- тонус: 3 подхода × 12-15 повторений, отдых 60 сек",
-            _ => "- умеренные нагрузки"
-        })}
+{GetGoalRequirements(goal)}
 
-Верни JSON массив дней тренировок в формате:
+Создай ровно {daysPerWeek} тренировочных дней (без дней отдыха).
+Каждый тренировочный день должен содержать 4-6 упражнений.
+
+Верни ТОЛЬКО JSON массив в таком формате (без пояснений):
+
 [
   {{
     ""dayNumber"": 1,
-    ""focus"": ""грудь+трицепс"",
+    ""focus"": ""Грудь + Трицепс"",
     ""exercises"": [
       {{
         ""name"": ""Жим штанги лежа"",
@@ -183,29 +302,39 @@ public class WorkoutGenerationService
   }}
 ]
 
-Важно:
-- Учитывай доступное оборудование
-- Соблюдай требования к цели
-- День 1 = понедельник, день 7 = воскресенье
-- Не повторяй одинаковые упражнения
+ВАЖНО: 
+- Дни должны идти по порядку: 1, 2, 3, 4, 5, 6, 7
+- НИКОГДА не используй dayNumber = 0
+- Не включай дни отдыха в программу
 - Верни ТОЛЬКО JSON, без пояснений
 ";
     }
 
-    // ИСПРАВЛЕНО: переименовал параметр исключения, чтобы не конфликтовать с переменной ex в цикле
     private List<Exercise> ConvertToExercises(List<ExerciseDto> exerciseDtos)
     {
         var exercises = new List<Exercise>();
 
-        foreach (var exDto in exerciseDtos)  // ← переименовал ex → exDto
+        if (exerciseDtos == null || !exerciseDtos.Any())
+        {
+            _logger.LogWarning("ConvertToExercises received empty list");
+            return exercises;
+        }
+
+        foreach (var exDto in exerciseDtos)
         {
             try
             {
-                // Определяем тип упражнения по equipment
+                if (string.IsNullOrEmpty(exDto.Name))
+                {
+                    _logger.LogWarning("Exercise has no name, skipping");
+                    continue;
+                }
+
+                // Определяем тип упражнения
                 if (exDto.Equipment?.ToLower() == "running" || exDto.Name?.ToLower().Contains("бег") == true)
                 {
                     exercises.Add(new RunningExercise(
-                        name: exDto.Name ?? "Бег",
+                        name: exDto.Name,
                         met: 8.0f,
                         durationMinutes: 20,
                         distanceKm: 3,
@@ -215,25 +344,28 @@ public class WorkoutGenerationService
                 }
                 else
                 {
-                    // ИСПРАВЛЕНО: exerciseType → strengthExerciseType
+                    var equipment = ParseEquipment(exDto.Equipment ?? "bodyweight");
+                    var weight = exDto.Weight > 0 ? (decimal?)exDto.Weight : null;
+
                     exercises.Add(new StrengthExercise(
-                        name: exDto.Name ?? "Упражнение",
+                        name: exDto.Name,
                         met: 4.0f,
-                        sets: exDto.Sets,
-                        reps: exDto.Reps,
-                        muscleGroup: exDto.MuscleGroup ?? "other",
-                        strengthExerciseType: StrengthExerciseType.Compound,  // ← ИСПРАВЛЕНО
-                        equipment: ParseEquipment(exDto.Equipment ?? "bodyweight"),
-                        weightKg: exDto.Weight > 0 ? (decimal?)exDto.Weight : null
+                        sets: exDto.Sets > 0 ? exDto.Sets : 3,
+                        reps: exDto.Reps > 0 ? exDto.Reps : 10,
+                        muscleGroup: string.IsNullOrEmpty(exDto.MuscleGroup) ? "other" : exDto.MuscleGroup,
+                        strengthExerciseType: StrengthExerciseType.Compound,
+                        equipment: equipment,
+                        weightKg: weight
                     ));
                 }
             }
-            catch (Exception ex)  // ← это исключение не конфликтует
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating exercise {ExerciseName}", exDto.Name);
             }
         }
 
+        _logger.LogInformation("Converted {Count} exercises", exercises.Count);
         return exercises;
     }
 
@@ -245,8 +377,8 @@ public class WorkoutGenerationService
             "dumbbell" or "dumbbells" => Equipment.Dumbbell,
             "machine" => Equipment.Machine,
             "kettlebell" or "kettlebells" => Equipment.Kettlebell,
-            "pullup" or "pull-up" or "pullupbar" => Equipment.PullUpBar,
-            "bars" or "parallelbars" => Equipment.ParallelBars,
+            "pullup" or "pull-up" or "pullupbar" or "pull-up-bar" => Equipment.PullUpBar,
+            "bars" or "parallelbars" or "dips" => Equipment.ParallelBars,
             "resistance" => Equipment.Resistance,
             "cable" or "cables" => Equipment.Cable,
             _ => Equipment.Bodyweight
@@ -273,6 +405,50 @@ public class WorkoutGenerationService
         "endurance" => "Выносливость",
         "tone" => "Тонус",
         _ => goal
+    };
+
+    private string GetGoalDescription(string goal) => goal switch
+    {
+        "strength" => "увеличение силы",
+        "mass" => "набор мышечной массы",
+        "weight_loss" => "похудение",
+        "endurance" => "повышение выносливости",
+        "tone" => "поддержание тонуса",
+        _ => goal
+    };
+
+    private string GetExperienceDescription(string experience) => experience switch
+    {
+        "beginner" => "начинающий",
+        "intermediate" => "средний",
+        "advanced" => "продвинутый",
+        _ => experience
+    };
+
+    private string GetLocationDescription(string location) => location switch
+    {
+        "gym" => "фитнес-клуб",
+        "home" => "дома",
+        "street" => "на улице",
+        _ => location
+    };
+
+    private string GetEquipmentDescription(string location) => location switch
+    {
+        "street" => "турник, брусья, скамья, свой вес",
+        "home" => "гантели, резинки, свой вес",
+        "gym" => "все оборудование доступно",
+        _ => "базовое оборудование"
+    };
+
+    private string GetGoalRequirements(string goal) => goal switch
+    {
+        "strength" => "4-5 подходов × 4-6 повторений, вес 80-85%",
+        "mass" => "3-4 подхода × 8-12 повторений, вес 70-75%",
+        "weight_loss" => "3-4 подхода × 15-20 повторений, вес 50-60%, добавить кардио",
+        "endurance" => "3-4 подхода × 15-25 повторений, вес 40-50%",
+        "tone" => "3 подхода × 12-15 повторений, вес 60-70%",
+        _ => "умеренные нагрузки"
     };
 
     private class WorkoutDay

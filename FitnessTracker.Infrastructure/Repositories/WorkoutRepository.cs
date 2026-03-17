@@ -35,8 +35,10 @@ public class WorkoutRepository : IWorkoutRepository
     /// <inheritdoc />
     public virtual async Task<Workout?> GetByIdAsync(long telegramId, DateTime date, CancellationToken cancellationToken = default)
     {
-        // Ищем тренировку по составному ключу (TelegramId + Date)
-        return await DbSet.FindAsync(new object[] { telegramId, date }, cancellationToken);
+        // Используем FirstOrDefault вместо FindAsync, так как у нас составной ключ
+        var dateOnly = date.Date;
+        return await DbSet
+            .FirstOrDefaultAsync(w => w.TelegramId == telegramId && w.Date == dateOnly, cancellationToken);
     }
 
     /// <inheritdoc />

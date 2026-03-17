@@ -6,7 +6,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\FitnessTracker.Application\FitnessTracker.Application.csproj" />
 		<ProjectReference Include="..\FitnessTracker.Domain\FitnessTracker.Domain.csproj" />
 	</ItemGroup>
 

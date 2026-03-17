@@ -19,15 +19,16 @@ public static class WorkoutStatus
 /// <summary>
 /// Ежедневная тренировка.
 /// </summary>
-public class Workout : Entity<Guid>  // ← Изменили на Guid
+public class Workout : Entity<Guid>
 {
     // Явные свойства, соответствующие SQL
     public long TelegramId { get; private set; }
     public DateTime Date { get; private set; }
 
-    private readonly List<Exercise> _exercises = new();
-    public IReadOnlyCollection<Exercise> Exercises => _exercises.AsReadOnly();
+    // Изменено с _exercises на Exercises (теперь это публичное свойство)
+    public List<Exercise> Exercises { get; private set; } = new();
 
+    // Эти свойства будут игнорироваться при маппинге
     public string? Notes { get; private set; }
     public string Status { get; private set; }
     public TimeSpan? TotalDuration { get; private set; }
@@ -37,6 +38,7 @@ public class Workout : Entity<Guid>  // ← Изменили на Guid
     private Workout() : base(Guid.NewGuid())
     {
         Status = WorkoutStatus.Planned;
+        Exercises = new List<Exercise>();
     }
 
     private Workout(long telegramId, DateTime date, IEnumerable<Exercise> exercises)
@@ -44,7 +46,7 @@ public class Workout : Entity<Guid>  // ← Изменили на Guid
     {
         TelegramId = telegramId;
         Date = date;
-        _exercises.AddRange(exercises);
+        Exercises = exercises.ToList(); // Исправлено: _exercises -> Exercises
         Status = WorkoutStatus.Planned;
         RecalculateMetrics();
     }
@@ -60,17 +62,24 @@ public class Workout : Entity<Guid>  // ← Изменили на Guid
         return new Workout(telegramId, date, exercises ?? Array.Empty<Exercise>());
     }
 
+    /// <summary>
+    /// Обновить упражнения в тренировке
+    /// </summary>
     public Workout UpdateExercises(IEnumerable<Exercise> newExercises)
     {
+        // Создаем новую тренировку с обновленными упражнениями
         var updated = new Workout(TelegramId, Date, newExercises ?? Array.Empty<Exercise>());
+
+        // Копируем дополнительные поля
         updated.Notes = Notes;
         updated.Status = Status;
+
         return updated;
     }
 
     public void Complete(string? notes = null)
     {
-        if (!_exercises.Any())
+        if (!Exercises.Any()) // Исправлено: _exercises -> Exercises
         {
             throw new WorkoutNotFoundException(TelegramId, Date);
         }
@@ -85,8 +94,8 @@ public class Workout : Entity<Guid>  // ← Изменили на Guid
         Notes = reason;
     }
 
-    public bool HasExercises => _exercises.Any();
-    public int ExerciseCount => _exercises.Count;
+    public bool HasExercises => Exercises.Any(); // Исправлено: _exercises -> Exercises
+    public int ExerciseCount => Exercises.Count; // Исправлено: _exercises -> Exercises
 
     private void RecalculateMetrics()
     {
@@ -96,7 +105,7 @@ public class Workout : Entity<Guid>  // ← Изменили на Guid
 
     private TimeSpan GetTotalDuration()
     {
-        var totalMinutes = _exercises
+        var totalMinutes = Exercises // Исправлено: _exercises -> Exercises
             .OfType<CardioExercise>()
             .Sum(e => e.DurationMinutes);
 
@@ -105,7 +114,7 @@ public class Workout : Entity<Guid>  // ← Изменили на Guid
 
     private int GetEstimatedCalories()
     {
-        return (int)_exercises
+        return (int)Exercises // Исправлено: _exercises -> Exercises
             .OfType<CardioExercise>()
             .Sum(e => e.MET * e.DurationMinutes * 3.5 / 200 * 60);
     }

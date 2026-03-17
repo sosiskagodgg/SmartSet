@@ -20,6 +20,7 @@ public abstract class Exercise : Entity<Guid>
     [JsonIgnore]
     public abstract ExerciseType Type { get; }
 
+    // Добавляем конструктор по умолчанию для сериализации
     protected Exercise() : base(Guid.NewGuid())
     {
         Name = string.Empty;

@@ -247,10 +247,38 @@ public class GigaChatProvider : IAiProvider
             var start = json.IndexOf('{');
             var end = json.LastIndexOf('}');
             if (start >= 0 && end >= 0 && end > start)
-                return json.Substring(start, end - start + 1);
+                json = json.Substring(start, end - start + 1);
         }
 
-        // Убираем возможные пробелы в начале/конце
-        return json.Trim();
+        // Находим начало массива [
+        var arrayStart = json.IndexOf('[');
+        var arrayEnd = json.LastIndexOf(']');
+
+        if (arrayStart >= 0 && arrayEnd >= 0 && arrayEnd > arrayStart)
+        {
+            json = json.Substring(arrayStart, arrayEnd - arrayStart + 1);
+        }
+
+        // ИСПРАВЛЯЕМ: удаляем лишние { перед объектами в массиве
+        json = FixJsonArrayErrors(json);
+
+        return json;
+    }
+
+    private static string FixJsonArrayErrors(string json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return json;
+
+        // Удаляем лишние { { (две открывающие скобки подряд)
+        json = System.Text.RegularExpressions.Regex.Replace(json, @"\{\s*\{", "{");
+
+        // Исправляем паттерн: , { { на , {
+        json = System.Text.RegularExpressions.Regex.Replace(json, @",\s*\{\s*\{", ", {");
+
+        // Исправляем паттерн: [ { { на [ {
+        json = System.Text.RegularExpressions.Regex.Replace(json, @"\[\s*\{\s*\{", "[ {");
+
+        return json;
     }
 }
